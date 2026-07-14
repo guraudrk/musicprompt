@@ -631,6 +631,42 @@ instruction was also strengthened to state this explicitly. See `docs/TROUBLESHO
 
 ---
 
+## ADR-034 — Reference/deliberate-differences + structure/emotion-curve UI: extend the one dense page again, order derived from list position
+
+- Status: Accepted
+- Date: 2026-07-14
+
+### Decision
+
+The Phase 2-tail UI first slice adds two new sections to the existing single project page
+(`ProjectEditor.tsx`) rather than starting the full 8/14-screen wizard from `docs/PRODUCT_SPEC.md`
+§16: "Reference & deliberate differences" (`reference`, `deliberateDifferences`) and "Structure &
+emotion curve" (`structure`, `emotionCurve`). All four fields have existed on `SongDesignSpec`
+since Phase 1; this slice is the UI, not new schema — same category of work as ADR-033's lyrics
+drafting slice. This continues ADR-024's precedent rather than reopening it.
+
+`structure` rows expose Move-up/Move-down buttons instead of a manual `order` number field; `order`
+is computed from the row's position in the list at save time. A raw integer field the user has to
+keep in sync by hand is redundant and error-prone when the list itself already encodes order.
+
+### Reason
+
+Consistent with the established smallest-coherent-slice discipline (CLAUDE.md: "do not implement
+every phase in one turn"); the full wizard remains a distinctly larger, separate effort. The
+order-by-position mechanic removes a whole class of "list position and order field disagree" bugs
+without adding any UI complexity.
+
+### Consequence (live-verified correctness fix)
+
+Live testing found that `handleSave`'s error banner only ever displayed the API's generic
+`"Invalid song design spec."` message and silently discarded the specific Zod issue text
+(`parsed.error.issues`) the route already returned — meaning the schema's own `.check()` refinement
+message ("At least 3 deliberate differences are required...") was unreachable from the UI even
+though the server had always computed it correctly. Fixed by having `handleSave` append the joined
+`issues[].message` text to the displayed error. See `docs/TROUBLESHOOTING.md`.
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:

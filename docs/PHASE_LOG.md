@@ -448,3 +448,97 @@ See `DECISIONS.md` ADR-033.
   error rather than auto-repaired; the main pipeline's Stage G repair pass is unrelated.
 - Everything already pending from Phase 0-4 (DB hosting, deployment platform, budget-limit policy,
   logging/observability, app-level rate limiting, background jobs) is still pending.
+
+---
+
+## Phase 2-tail UI (first slice) — Reference/Deliberate Differences + Structure/Emotion Curve
+
+- Date: 2026-07-14
+- Status: **DONE (first-slice scope), live-verified**
+
+### 한글 요약
+
+- **무엇을 만들었나**: Phase 1부터 스키마에는 있었지만 "직접 API/JSON으로만" 편집 가능했던 두 영역에
+  드디어 UI를 붙였습니다. (1) "Reference & deliberate differences" 섹션 — 참조곡 유무 토글, 곡
+  제목/아티스트/참조 이유, surface traits(표면적 특징, 절대 결과물에 그대로 옮기지 않음)와 functional
+  principles(기능적 원칙, 결과물에 반영 가능) 목록 추가/삭제, similarity guardrails, 그리고 의도적
+  차이(dimension/fromReference/toNew) 목록 추가/삭제 — 참조곡을 설정하면 최소 3개가 필요하다는 기존
+  스키마 규칙을 실시간 카운트로 보여줍니다. (2) "Structure & emotion curve" 섹션 — 구조 섹션(이름,
+  극적 기능, 에너지 레벨, 길이, 노트) 추가/삭제와 Move up/down으로 순서 변경, 감정 곡선 포인트(위치,
+  에너지, 텐션, 발렌스) 추가/삭제. 두 영역 모두 새 스키마나 새 API 없이 기존 PATCH 하나로 저장됩니다.
+  구조의 `order` 필드는 사용자가 직접 숫자를 입력하지 않고 목록 내 위치에서 자동으로 계산합니다(입력과
+  실제 순서가 어긋날 일이 없음).
+- **실제 버그 발견 및 수정**: 라이브 테스트 중 저장 실패 시 에러 배너가 항상 API의 일반 메시지
+  ("Invalid song design spec.")만 보여주고, 서버가 이미 함께 반환하던 구체적인 Zod 검증 메시지
+  (`issues` 배열)는 그냥 버려지고 있었다는 걸 발견했습니다. 즉 참조곡을 설정하고 의도적 차이를 2개만
+  넣은 뒤 저장하면 저장은 실패하지만 "왜" 실패했는지 사용자는 전혀 알 수 없었습니다 — 이번 슬라이스가
+  처음으로 그 경로를 UI에서 실제로 밟아봤기 때문에 드러난 버그입니다. `handleSave`가 `issues[].message`를
+  에러 배너에 이어붙이도록 수정했고, 재검증 결과 "At least 3 deliberate differences are required..."
+  메시지가 실제로 화면에 뜨는 것을 확인했습니다.
+- **검증**: 새 Playwright 스펙(`tests/e2e/reference-structure.spec.ts`)으로 차이 2개→저장 실패(에러
+  메시지 노출 확인)→3번째 차이 추가→저장 성공→구조/감정 곡선 추가→저장→새로고침 후 값이 그대로 남아있는지
+  확인까지 전부 자동화했습니다. 기존 120개 유닛 테스트와 `happy-path.spec.ts`도 영향받지 않았습니다(단,
+  `happy-path.spec.ts`는 이번 작업과 무관하게 실제 Gemini 호출 지연/타임아웃으로 인한 사전 존재
+  플레이키니스가 있다는 걸 `git stash`로 원래 코드 기준에서도 재현해 확인했습니다 — 아래 트러블슈팅 참고).
+- **남은 것**: Theme/Ideation/Melody-fit/Revision 전용 화면, 화자/시점/문화권 선택 UI(Phase 5에서 이미
+  보류), `contrastPlan`/`hookPlan`/`repetitionPlan` 편집 UI, `compositionTheory.*Notes` 필드 잠금
+  버튼(Phase 4에서 이미 보류)은 여전히 없습니다. 전체 8/14단계 위저드(PRODUCT_SPEC §16)도 이번에도
+  시작하지 않고 기존 단일 페이지를 계속 확장하는 쪽을 택했습니다(ADR-024 연장, ADR-034).
+
+### What shipped
+
+- `ProjectEditor.tsx`: new "Reference & deliberate differences" section (reference toggle,
+  songTitle/artistName/userReason, surfaceTraits/functionalPrinciples/similarityGuardrails rows,
+  deliberateDifferences rows with a live `{count} / {MINIMUM_DELIBERATE_DIFFERENCES}` hint) and new
+  "Structure & emotion curve" section (structure rows with Move up/down, emotionCurve rows).
+- `buildSpecFromForm` extended to assemble `reference`/`deliberateDifferences`/`structure`/
+  `emotionCurve` — no new schema, no new API route; the existing `PATCH /api/projects/{id}` and its
+  Zod validation already supported all of this since Phase 1.
+- New `tests/e2e/reference-structure.spec.ts`.
+- `playwright.config.ts`: bumped the default `expect` timeout from 5000ms to 15000ms — compile
+  round-trips (real Gemini or its dev-fallback to Mock) vary from ~1s to 17s+, and the old default
+  was too tight (see Troubleshooting).
+
+### Live verification
+
+Against the already-running Docker Postgres and dev server:
+
+- Toggled a reference on, filled required fields, added exactly 2 deliberate differences, saved —
+  confirmed the save failed and the specific message ("At least 3 deliberate differences are
+  required when a reference is set.") appeared in the error banner for the first time.
+- Added a 3rd difference, saved — confirmed success (no error banner).
+- Added a structure section and an emotion-curve point, saved, reloaded the page — confirmed every
+  field's value round-tripped through Postgres correctly.
+- Re-ran Analyze after adding real (non-empty) structure data — confirmed it runs cleanly with no
+  crash (previously only ever exercised against `structure: []`); this particular structure content
+  didn't happen to change the specific warning count (6 before, 6 after) — the engines check
+  specific conditions (e.g. final-chorus escalation, pre-chorus purpose) that two generically-named
+  sections don't necessarily satisfy or violate.
+- Confirmed via `git stash` that `happy-path.spec.ts`'s intermittent compile-step failure
+  reproduces identically on the pre-existing, unmodified codebase — not a regression from this
+  slice (see Troubleshooting).
+
+### Verification at time of this entry
+
+- `pnpm typecheck`, `pnpm lint` — pass
+- `pnpm test` — 120/120 pass (unchanged — no new pure logic needed a unit test)
+- `pnpm build` — pass
+- `pnpm exec playwright test tests/e2e/reference-structure.spec.ts` — pass
+- Live walkthrough — pass (see above)
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-034.
+
+### Known gaps carried forward
+
+- The full 8/14-screen wizard (`docs/PRODUCT_SPEC.md` §16) — still one dense page (ADR-024 stands).
+- `contrastPlan` / `hookPlan` / `repetitionPlan` UI — not exposed yet, still API/JSON-only.
+- Phase 5's already-deferred items (Theme/Ideation/Melody-fit/Revision screens,
+  `culturalProfile`/`pointOfView`/`speaker`/`addressee` UI) — untouched by this slice.
+- Phase 4's already-deferred lock-field UI for `compositionTheory.*Notes` — still only Dismiss
+  exists client-side.
+- `happy-path.spec.ts`'s real-Gemini-latency flake — pre-existing, confirmed unrelated to this
+  slice; not fixed here (see Troubleshooting for what was and wasn't addressed).
+- Everything already pending from Phase 0-5 (DB hosting, deployment platform, budget-limit policy,
+  logging/observability, app-level rate limiting, background jobs) is still pending.

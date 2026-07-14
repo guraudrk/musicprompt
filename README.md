@@ -17,21 +17,25 @@
 
 ## 현재 상태
 
-**Phase 0–5 완료, 전부 라이브 검증까지 마침.** `SongDesignSpec` Zod 스키마, Generic/Suno/Udio Provider
-Registry, Auth.js 이메일/비밀번호 인증, Prisma/Postgres 영속성, 프로젝트 CRUD·컴파일·내보내기 API, 단일
-페이지 프로젝트 편집기, `@google/genai`(Interactions API)를 통한 실제 Gemini 구조화 출력 컴파일러(개발
-환경에서는 실패 시 Mock으로 자동 폴백), 7개 작곡 이론 엔진(FormFunction/MelodyMemory/HarmonyGravity/
-RhythmMomentum/Prosody/ArrangementForm/Subtraction), 그리고 가사 초안 A/B/C 생성기(`LyricsDraftGenerator`,
-Mock+Gemini)가 구현되어 있습니다 — 이론 엔진이 만든 제안은 프로젝트 페이지의 "Analyze" 버튼으로 확인하고,
-개별 제안을 거부(dismiss)하거나 특정 항목을 잠글(lock) 수 있으며, "Generate Drafts" 버튼으로 초안 3개를
-받아 라인 단위 diff를 확인한 뒤 적용할 수 있습니다. 직설/simple 모드는 어떤 기법도 쓰지 않고, 선택한
-기법만 초안에 나타나며(사용자가 고르지 않은 기법을 모델이 보고하면 검증 단계에서 거부), 잠근 가사 줄은
-모든 초안에 그대로 보존됩니다(`validateLyricsDraftSet`). 회원가입→프로젝트 생성→저장→컴파일→내보내기,
-다른 사용자 접근 차단, Playwright happy-path, 실제 Gemini API 호출로 Safe/Balanced/Bold 컴파일, 이론 엔진
-분석→제안 거부→재분석, 그리고 실제 Gemini 호출로 가사 초안 생성(직설 모드 기법 0개 확인, 기법 추적성
-버그 발견 및 수정)까지 전부 실제로 실행해 확인했습니다(`docs/PHASE_LOG.md` Phase 2/3/4/5 "Live
-verification" 참고). Theme/Ideation/Melody-fit/Revision 전용 화면, 화자·시점·문화권 선택 UI, 전체
-8단계 위저드 UI·PWA/모바일은 아직 없습니다(Phase 2 후반 UI 예정).
+**Phase 0–5 + Phase 2 후반 UI(1차) 완료, 전부 라이브 검증까지 마침.** `SongDesignSpec` Zod 스키마,
+Generic/Suno/Udio Provider Registry, Auth.js 이메일/비밀번호 인증, Prisma/Postgres 영속성, 프로젝트
+CRUD·컴파일·내보내기 API, 단일 페이지 프로젝트 편집기, `@google/genai`(Interactions API)를 통한 실제
+Gemini 구조화 출력 컴파일러(개발 환경에서는 실패 시 Mock으로 자동 폴백), 7개 작곡 이론 엔진(FormFunction/
+MelodyMemory/HarmonyGravity/RhythmMomentum/Prosody/ArrangementForm/Subtraction), 가사 초안 A/B/C
+생성기(`LyricsDraftGenerator`, Mock+Gemini), 그리고 참조곡·의도적 차이·구조·감정 곡선 편집 UI가 구현되어
+있습니다 — 이론 엔진이 만든 제안은 프로젝트 페이지의 "Analyze" 버튼으로 확인하고, 개별 제안을 거부
+(dismiss)하거나 특정 항목을 잠글(lock) 수 있으며, "Generate Drafts" 버튼으로 초안 3개를 받아 라인 단위
+diff를 확인한 뒤 적용할 수 있습니다. 참조곡을 등록하면 최소 3개의 의도적 차이가 필요하다는 기존 스키마
+검증이 이제 UI에서 실제로 보이며, 구조(섹션)와 감정 곡선도 추가/삭제/순서 변경(Move up/down)이 가능하고
+저장 후 새로고침해도 그대로 유지됩니다. 직설/simple 모드는 어떤 기법도 쓰지 않고, 선택한 기법만 초안에
+나타나며(사용자가 고르지 않은 기법을 모델이 보고하면 검증 단계에서 거부), 잠근 가사 줄은 모든 초안에
+그대로 보존됩니다(`validateLyricsDraftSet`). 회원가입→프로젝트 생성→저장→컴파일→내보내기, 다른 사용자
+접근 차단, Playwright happy-path, 실제 Gemini API 호출로 Safe/Balanced/Bold 컴파일, 이론 엔진 분석→제안
+거부→재분석, 실제 Gemini 호출로 가사 초안 생성(직설 모드 기법 0개 확인, 기법 추적성 버그 발견 및 수정),
+그리고 참조·구조·감정 곡선 편집(차이 3개 미만 저장 시 에러 노출 확인, 저장/새로고침 영속성 확인)까지
+전부 실제로 실행해 확인했습니다(`docs/PHASE_LOG.md` Phase 2/3/4/5 및 Phase 2-tail "Live verification"
+참고). Theme/Ideation/Melody-fit/Revision 전용 화면, 화자·시점·문화권 선택 UI, contrastPlan/hookPlan/
+repetitionPlan 편집 UI, 전체 8/14단계 위저드 UI·PWA/모바일은 아직 없습니다.
 
 상세는 [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md), [`docs/PHASE_LOG.md`](docs/PHASE_LOG.md),
 [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) 참고.

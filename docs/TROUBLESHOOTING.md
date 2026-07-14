@@ -268,3 +268,63 @@ No other new environment/tooling issues this phase — the Windows Git Bash `/tm
 issue from Phase 0-3 (see above) did not recur, since this phase's live verification used direct
 `curl`/dev-server calls rather than file round-tripping through `node -e`.
 
+---
+
+## Phase 2-tail UI (reference/deliberate-differences, structure/emotion-curve)
+
+### Save-error banner discarded the API's specific validation message
+
+**Symptom:** Setting a reference and only 2 `deliberateDifferences`, then saving, failed as
+expected (the schema's own `.check()` refinement requires >=3), but the error banner only ever
+showed the generic `"Invalid song design spec."` — never the actual reason.
+
+**Cause:** `PATCH /api/projects/{id}`'s 400 response always included both a generic `error` string
+*and* the full Zod `issues` array (`src/app/api/projects/[projectId]/route.ts:28`), but
+`ProjectEditor.tsx`'s `handleSave` only ever read `body.error`, silently discarding `body.issues`.
+This bug pre-dates this slice — every field with a non-trivial refinement (not just
+`deliberateDifferences`) was equally affected — but it was only caught now because this is the
+first slice whose UI can actually construct a spec that fails a refinement rather than a plain
+required-field check.
+
+**Fix:** `handleSave` now appends `issues.map(i => i.message).join(" ")` to the displayed error.
+Re-verified live: saving with 2 differences now shows "Invalid song design spec. — At least 3
+deliberate differences are required when a reference is set." General lesson: when a route returns
+both a summary and structured detail on error, check the client actually surfaces the detail — a
+"successful" 400 handler that only shows the summary can hide the entire reason for months.
+
+### Playwright locator ambiguity (same category as Phase 2's fix, new instances)
+
+**Symptom:** Two new strict-mode violations in `tests/e2e/reference-structure.spec.ts`: (1)
+`getByRole("alert")` matched both the app's own `<p role="alert">` error banner and Next.js's
+router-announcer `<div role="alert">`; (2) `getByLabel("Energy")` matched both the new "Energy"
+(emotion curve) field and the pre-existing "Energy level (0-100)" (structure) field via partial
+text matching.
+
+**Fix:** Switched to `getByText(...)`/`page.locator('p[role="alert"]')` for the first, and
+`{ exact: true }` for the second. Same underlying lesson as Phase 2's `getByText("safe")` fix:
+prefer the most specific locator available, and use `exact: true` whenever a label could be a
+substring of another visible label.
+
+### Pre-existing `happy-path.spec.ts` flake, confirmed unrelated to this slice
+
+**Symptom:** `tests/e2e/happy-path.spec.ts` intermittently fails at the "safe"/"balanced"/"bold"
+heading assertion after clicking Compile, with the compile request itself succeeding (HTTP 200)
+but taking anywhere from ~5s to ~15s+. The dev server log shows
+`[GeminiPromptCompiler] compile failed, falling back to Mock in development: Request timed out:
+TimeoutError: The operation was aborted due to timeout` — real Gemini calls in this environment are
+failing/timing out well before the configured 60s `GEMINI_REQUEST_OPTIONS.timeout`
+(`src/llm/gemini/resilience.ts`), suggesting a live network/quota condition rather than the app's
+own timeout budget being exceeded.
+
+**Investigation:** Used `git stash` to run the exact same test against the pre-existing,
+unmodified codebase (before any of this slice's changes) — it failed identically. This confirms
+the flake is not caused by anything in this slice; the compile code path (`handleCompile`,
+`/api/projects/{id}/compile/compare`) was not touched.
+
+**Partial mitigation, not a full fix:** Bumped Playwright's default `expect` timeout from 5000ms to
+15000ms (`playwright.config.ts`) since the old default was tight even for a *successful*
+Mock-fallback round-trip. This did not fully resolve the flake (one run still failed at exactly the
+new 15000ms boundary) — real Gemini API reliability/latency in this environment is outside this
+slice's scope to fix, and is tracked as a known gap rather than resolved here. `tests/e2e/
+reference-structure.spec.ts` does not depend on the compile endpoint and passes reliably.
+

@@ -150,10 +150,18 @@ Scope for this slice is trimmed to one dense project page rather than the full 8
   server-side and overwrites; no conflict rejection on stale client version (documented
   simplification, not silently dropped — see ADR-024)
 - [x] North Star screen — folded into the single project page, not a separate step
-- [ ] Reference principles and deliberate differences — not exposed in the UI form this slice
-  (schema/back end already support it; editable only via direct API/JSON for now)
+- [x] Reference principles and deliberate differences — Phase 2-tail UI slice (ADR-034) added a
+  "Reference & deliberate differences" section to the project page: reference toggle, surface
+  traits, functional principles, similarity guardrails, and add/remove deliberate-difference rows
+  with a live count against `MINIMUM_DELIBERATE_DIFFERENCES`. Live-verified: saving with only 2
+  differences surfaces the schema's own refinement error in the UI for the first time; a 3rd
+  difference makes the save succeed.
 - [x] Basic music identity — genres/tempo/instrumentation fields on the project page
-- [ ] Basic structure and emotion curve — not exposed in the UI form this slice (same as above)
+- [x] Basic structure and emotion curve — Phase 2-tail UI slice (ADR-034) added a "Structure &
+  emotion curve" section: add/remove/reorder (Move up/down) `structure` rows and add/remove
+  `emotionCurve` rows. `order` is derived from list position at save time rather than a manual
+  field. Live-verified: data round-trips through Postgres on reload, and re-running Analyze against
+  real (non-empty) structure data runs cleanly (previously only ever exercised against `structure: []`).
 - [x] Basic lyric mode — mode select + lyrics text + locked lines on the project page
 - [x] Provider selection — generic/suno/udio checkboxes
 - [x] Prompt results — Safe/Balanced/Bold shown after Compile, persisted to `PromptPackage` rows
@@ -517,7 +525,19 @@ Each requires official capability verification and tests.
    analyzed a real project (6 real warnings), dismissed one and confirmed it stayed filtered,
    locked a notes field and confirmed re-analyze didn't overwrite it, then confirmed compile still
    works end-to-end with the real theory summary feeding Stage D.
-6. **Next actual work**: the Phase 2-tail UI (reference/deliberate-differences,
-   structure/emotion-curve editing, full 8-screen wizard) or Phase 5 (advanced lyrics). A budget-
-   limit policy decision is still pending before Gemini usage caps can be implemented
-   (see `DECISIONS.md`).
+6. ~~Complete Phase 5 (advanced lyrics) and live-verify it.~~ Done — `LyricsDraftGenerator`
+   (Mock + Gemini), `validateLyricsDraftSet()`, `diffLines()`, and the draft/diff/apply UI; 120
+   unit tests (up from 99); live-verified direct mode (zero techniques), locked-line preservation,
+   and a real technique-traceability bug found and fixed. See `docs/PHASE_LOG.md`/`TROUBLESHOOTING.md`.
+7. ~~Complete the Phase 2-tail UI first slice (reference/deliberate-differences,
+   structure/emotion-curve) and live-verify it.~~ Done — ADR-034, still one dense project page
+   (not the full 8/14-screen wizard). Live-verified: the schema's own `.check()` refinement
+   (>=3 differences once a reference is set) is reachable from the UI for the first time and
+   surfaces correctly; structure/emotion-curve rows round-trip through Postgres; re-running Analyze
+   against real structure data runs cleanly. Caught and fixed a real bug: the save-error banner
+   only ever showed the generic `"Invalid song design spec."` message, silently dropping the
+   specific Zod issue text the API already returned — see `docs/TROUBLESHOOTING.md`.
+8. **Next actual work**: the full 8/14-screen wizard (PRODUCT_SPEC §16) remains out of scope for
+   now; other candidates are Phase 6 (Revision Lab), `contrastPlan`/`hookPlan`/`repetitionPlan` UI,
+   or the lock-field UI for `compositionTheory.*Notes` (deferred since Phase 4). A budget-limit
+   policy decision is still pending before Gemini usage caps can be implemented (see `DECISIONS.md`).

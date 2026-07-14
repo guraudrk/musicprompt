@@ -23,4 +23,8 @@ export default defineConfig({
     // without an explicit grant.
     permissions: ["clipboard-read", "clipboard-write"],
   },
+  // Compile/compare round-trips to real Gemini (or its dev-fallback to Mock) vary widely, from
+  // ~1s (fast Mock fallback) to 17s+ (real structured-output calls, see docs/TROUBLESHOOTING.md
+  // Phase 0-3) — the 5000ms default `expect` timeout was too tight and flaked reproducibly.
+  expect: { timeout: 15_000 },
 });

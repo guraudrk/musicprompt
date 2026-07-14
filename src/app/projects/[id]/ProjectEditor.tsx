@@ -7,6 +7,10 @@ import type { LyricsMode } from "@/domain/songDesignSpec/lyrics";
 import type { MusicAIPromptPackage } from "@/domain/promptPackage/schema";
 import type { CompositionTheorySpec } from "@/domain/songDesignSpec/theory";
 import type { LyricsDraft } from "@/domain/lyrics/draft";
+import type { ReferenceTrait, ReferencePrinciple } from "@/domain/songDesignSpec/reference";
+import type { DeliberateDifference, DeliberateDifferenceDimension } from "@/domain/songDesignSpec/difference";
+import { MINIMUM_DELIBERATE_DIFFERENCES } from "@/domain/songDesignSpec/difference";
+import type { DramaticSection, EmotionPoint } from "@/domain/songDesignSpec/structure";
 import { diffLines } from "@/lib/diffLines";
 
 const LYRICS_MODES: LyricsMode[] = [
@@ -21,6 +25,27 @@ const LYRICS_MODES: LyricsMode[] = [
 ];
 
 const PROVIDER_IDS = ["generic", "suno", "udio"] as const;
+
+const DIMENSIONS: DeliberateDifferenceDimension[] = [
+  "genre",
+  "theme",
+  "narrator",
+  "conflict",
+  "ending",
+  "vocalDelivery",
+  "instrumentation",
+  "rhythmicCharacter",
+  "hookType",
+  "emotionCurve",
+  "eraTexture",
+  "other",
+];
+
+function makeId(): string {
+  return crypto.randomUUID();
+}
+
+type FunctionalPrincipleRow = ReferencePrinciple & { appliesToText: string };
 
 type CompareResult = { safe: MusicAIPromptPackage; balanced: MusicAIPromptPackage; bold: MusicAIPromptPackage };
 
@@ -52,6 +77,22 @@ export function ProjectEditor({ project }: { project: Project }) {
   const [originalLyrics, setOriginalLyrics] = useState(spec.lyricsDesign.originalLyrics ?? "");
   const [lockedLinesText, setLockedLinesText] = useState(spec.lyricsDesign.lockedLines.join("\n"));
 
+  const [hasReference, setHasReference] = useState(!!spec.reference);
+  const [refSongTitle, setRefSongTitle] = useState(spec.reference?.songTitle ?? "");
+  const [refArtistName, setRefArtistName] = useState(spec.reference?.artistName ?? "");
+  const [refUserReason, setRefUserReason] = useState(spec.reference?.userReason ?? "");
+  const [surfaceTraits, setSurfaceTraits] = useState<ReferenceTrait[]>(spec.reference?.surfaceTraits ?? []);
+  const [functionalPrinciples, setFunctionalPrinciples] = useState<FunctionalPrincipleRow[]>(
+    (spec.reference?.functionalPrinciples ?? []).map((p) => ({ ...p, appliesToText: (p.appliesTo ?? []).join(", ") })),
+  );
+  const [similarityGuardrailsText, setSimilarityGuardrailsText] = useState(
+    (spec.reference?.similarityGuardrails ?? []).join(", "),
+  );
+  const [deliberateDifferences, setDeliberateDifferences] = useState<DeliberateDifference[]>(spec.deliberateDifferences);
+
+  const [structure, setStructure] = useState<DramaticSection[]>(spec.structure);
+  const [emotionCurve, setEmotionCurve] = useState<EmotionPoint[]>(spec.emotionCurve);
+
   const [exclusionsText, setExclusionsText] = useState(spec.exclusions.join(", "));
   const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>(spec.providerSelection.selectedProviderIds);
 
@@ -72,6 +113,71 @@ export function ProjectEditor({ project }: { project: Project }) {
   const [draftError, setDraftError] = useState<string | null>(null);
   const [diffTarget, setDiffTarget] = useState<LyricsDraft | null>(null);
 
+  function addSurfaceTrait() {
+    setSurfaceTraits((rows) => [...rows, { id: makeId(), description: "" }]);
+  }
+  function updateSurfaceTrait(id: string, description: string) {
+    setSurfaceTraits((rows) => rows.map((r) => (r.id === id ? { ...r, description } : r)));
+  }
+  function removeSurfaceTrait(id: string) {
+    setSurfaceTraits((rows) => rows.filter((r) => r.id !== id));
+  }
+
+  function addFunctionalPrinciple() {
+    setFunctionalPrinciples((rows) => [...rows, { id: makeId(), description: "", appliesToText: "" }]);
+  }
+  function updateFunctionalPrinciple(id: string, field: "description" | "appliesToText", value: string) {
+    setFunctionalPrinciples((rows) => rows.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+  }
+  function removeFunctionalPrinciple(id: string) {
+    setFunctionalPrinciples((rows) => rows.filter((r) => r.id !== id));
+  }
+
+  function addDeliberateDifference() {
+    setDeliberateDifferences((rows) => [
+      ...rows,
+      { id: makeId(), dimension: "other", fromReference: "", toNew: "" },
+    ]);
+  }
+  function updateDeliberateDifference(id: string, field: keyof DeliberateDifference, value: string) {
+    setDeliberateDifferences((rows) => rows.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+  }
+  function removeDeliberateDifference(id: string) {
+    setDeliberateDifferences((rows) => rows.filter((r) => r.id !== id));
+  }
+
+  function addStructureSection() {
+    setStructure((rows) => [
+      ...rows,
+      { id: makeId(), name: "", dramaticFunction: "", order: rows.length, energyLevel: 50 },
+    ]);
+  }
+  function updateStructureSection(id: string, field: keyof DramaticSection, value: string | number | undefined) {
+    setStructure((rows) => rows.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+  }
+  function removeStructureSection(id: string) {
+    setStructure((rows) => rows.filter((r) => r.id !== id));
+  }
+  function moveStructureSection(index: number, direction: -1 | 1) {
+    setStructure((rows) => {
+      const target = index + direction;
+      if (target < 0 || target >= rows.length) return rows;
+      const next = [...rows];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
+  function addEmotionPoint() {
+    setEmotionCurve((rows) => [...rows, { position: 0, energy: 50, tension: 50 }]);
+  }
+  function updateEmotionPoint(index: number, field: keyof EmotionPoint, value: number | undefined) {
+    setEmotionCurve((rows) => rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
+  }
+  function removeEmotionPoint(index: number) {
+    setEmotionCurve((rows) => rows.filter((_, i) => i !== index));
+  }
+
   function buildSpecFromForm(base: SongDesignSpec): SongDesignSpec {
     return {
       ...base,
@@ -91,6 +197,22 @@ export function ProjectEditor({ project }: { project: Project }) {
       },
       exclusions: splitList(exclusionsText),
       providerSelection: { ...base.providerSelection, selectedProviderIds },
+      reference: hasReference
+        ? {
+            songTitle: refSongTitle || undefined,
+            artistName: refArtistName || undefined,
+            userReason: refUserReason,
+            surfaceTraits,
+            functionalPrinciples: functionalPrinciples.map(({ appliesToText, ...p }) => ({
+              ...p,
+              appliesTo: splitList(appliesToText),
+            })),
+            similarityGuardrails: splitList(similarityGuardrailsText),
+          }
+        : undefined,
+      deliberateDifferences,
+      structure: structure.map((s, i) => ({ ...s, order: i })),
+      emotionCurve,
     };
   }
 
@@ -108,7 +230,8 @@ export function ProjectEditor({ project }: { project: Project }) {
     setSaving(false);
     if (!response.ok) {
       const body = await response.json().catch(() => ({ error: "Save failed." }));
-      setSaveError(body.error ?? "Save failed.");
+      const issues = Array.isArray(body.issues) ? body.issues.map((i: { message: string }) => i.message).join(" ") : "";
+      setSaveError([body.error, issues].filter(Boolean).join(" — ") || "Save failed.");
       return;
     }
     const { project: updated } = await response.json();
@@ -269,6 +392,102 @@ export function ProjectEditor({ project }: { project: Project }) {
       </section>
 
       <section>
+        <h2>Reference &amp; deliberate differences</h2>
+        <label>
+          <input type="checkbox" checked={hasReference} onChange={(e) => setHasReference(e.target.checked)} />
+          Has a reference song
+        </label>
+
+        {hasReference && (
+          <>
+            <label>
+              Reference song title
+              <input value={refSongTitle} onChange={(e) => setRefSongTitle(e.target.value)} />
+            </label>
+            <label>
+              Reference artist name
+              <input value={refArtistName} onChange={(e) => setRefArtistName(e.target.value)} />
+            </label>
+            <label>
+              Why this reference
+              <input value={refUserReason} onChange={(e) => setRefUserReason(e.target.value)} />
+            </label>
+
+            <h3>Surface traits (never carried into output)</h3>
+            {surfaceTraits.map((trait) => (
+              <div key={trait.id} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.25rem" }}>
+                <input
+                  value={trait.description}
+                  onChange={(e) => updateSurfaceTrait(trait.id, e.target.value)}
+                  placeholder="e.g. signature riff"
+                  style={{ flex: 1 }}
+                />
+                <button onClick={() => removeSurfaceTrait(trait.id)}>Remove</button>
+              </div>
+            ))}
+            <button onClick={addSurfaceTrait}>Add surface trait</button>
+
+            <h3>Functional principles (may be carried forward)</h3>
+            {functionalPrinciples.map((p) => (
+              <div key={p.id} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.25rem" }}>
+                <input
+                  value={p.description}
+                  onChange={(e) => updateFunctionalPrinciple(p.id, "description", e.target.value)}
+                  placeholder="e.g. restrained verse vs. expanded chorus"
+                  style={{ flex: 1 }}
+                />
+                <input
+                  value={p.appliesToText}
+                  onChange={(e) => updateFunctionalPrinciple(p.id, "appliesToText", e.target.value)}
+                  placeholder="applies to (comma-separated)"
+                  style={{ flex: 1 }}
+                />
+                <button onClick={() => removeFunctionalPrinciple(p.id)}>Remove</button>
+              </div>
+            ))}
+            <button onClick={addFunctionalPrinciple}>Add functional principle</button>
+
+            <label>
+              Similarity guardrails (comma-separated)
+              <input value={similarityGuardrailsText} onChange={(e) => setSimilarityGuardrailsText(e.target.value)} />
+            </label>
+
+            <h3>
+              Deliberate differences ({deliberateDifferences.length} / {MINIMUM_DELIBERATE_DIFFERENCES} minimum)
+            </h3>
+            {deliberateDifferences.map((d) => (
+              <div key={d.id} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.25rem" }}>
+                <select
+                  value={d.dimension}
+                  onChange={(e) => updateDeliberateDifference(d.id, "dimension", e.target.value)}
+                >
+                  {DIMENSIONS.map((dim) => (
+                    <option key={dim} value={dim}>
+                      {dim}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={d.fromReference}
+                  onChange={(e) => updateDeliberateDifference(d.id, "fromReference", e.target.value)}
+                  placeholder="from reference"
+                  style={{ flex: 1 }}
+                />
+                <input
+                  value={d.toNew}
+                  onChange={(e) => updateDeliberateDifference(d.id, "toNew", e.target.value)}
+                  placeholder="to new"
+                  style={{ flex: 1 }}
+                />
+                <button onClick={() => removeDeliberateDifference(d.id)}>Remove</button>
+              </div>
+            ))}
+            <button onClick={addDeliberateDifference}>Add deliberate difference</button>
+          </>
+        )}
+      </section>
+
+      <section>
         <h2>Musical identity</h2>
         <label>
           Genres (comma-separated)
@@ -282,6 +501,109 @@ export function ProjectEditor({ project }: { project: Project }) {
           Instrumentation (comma-separated)
           <input value={instrumentationText} onChange={(e) => setInstrumentationText(e.target.value)} />
         </label>
+      </section>
+
+      <section>
+        <h2>Structure &amp; emotion curve</h2>
+
+        <h3>Structure</h3>
+        {structure.map((s, i) => (
+          <div key={s.id} style={{ border: "1px solid currentColor", padding: "0.5rem", marginBottom: "0.5rem" }}>
+            <label>
+              Section name
+              <input value={s.name} onChange={(e) => updateStructureSection(s.id, "name", e.target.value)} />
+            </label>
+            <label>
+              Dramatic function
+              <input
+                value={s.dramaticFunction}
+                onChange={(e) => updateStructureSection(s.id, "dramaticFunction", e.target.value)}
+                placeholder="e.g. initiation, buildup, arrival, contrast"
+              />
+            </label>
+            <label>
+              Energy level (0-100)
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={s.energyLevel}
+                onChange={(e) => updateStructureSection(s.id, "energyLevel", Number(e.target.value))}
+              />
+            </label>
+            <label>
+              Length (bars, optional)
+              <input
+                type="number"
+                min={1}
+                value={s.lengthBars ?? ""}
+                onChange={(e) => updateStructureSection(s.id, "lengthBars", e.target.value ? Number(e.target.value) : undefined)}
+              />
+            </label>
+            <label>
+              Notes (optional)
+              <input value={s.notes ?? ""} onChange={(e) => updateStructureSection(s.id, "notes", e.target.value)} />
+            </label>
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <button onClick={() => moveStructureSection(i, -1)} disabled={i === 0}>
+                Move up
+              </button>
+              <button onClick={() => moveStructureSection(i, 1)} disabled={i === structure.length - 1}>
+                Move down
+              </button>
+              <button onClick={() => removeStructureSection(s.id)}>Remove</button>
+            </div>
+          </div>
+        ))}
+        <button onClick={addStructureSection}>Add section</button>
+
+        <h3>Emotion curve</h3>
+        {emotionCurve.map((point, i) => (
+          <div key={i} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.25rem", alignItems: "center" }}>
+            <label>
+              Position
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={point.position}
+                onChange={(e) => updateEmotionPoint(i, "position", Number(e.target.value))}
+              />
+            </label>
+            <label>
+              Energy
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={point.energy}
+                onChange={(e) => updateEmotionPoint(i, "energy", Number(e.target.value))}
+              />
+            </label>
+            <label>
+              Tension
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={point.tension}
+                onChange={(e) => updateEmotionPoint(i, "tension", Number(e.target.value))}
+              />
+            </label>
+            <label>
+              Valence (optional)
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={point.valence ?? ""}
+                onChange={(e) => updateEmotionPoint(i, "valence", e.target.value ? Number(e.target.value) : undefined)}
+              />
+            </label>
+            <button onClick={() => removeEmotionPoint(i)}>Remove</button>
+          </div>
+        ))}
+        <button onClick={addEmotionPoint}>Add emotion point</button>
       </section>
 
       <section>
