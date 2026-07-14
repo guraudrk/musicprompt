@@ -1,4 +1,5 @@
 import type { PromptCompiler, PromptEvaluator, ProviderCompilerInput, PromptRepairInput, PromptEvaluationInput } from "@/compiler/types";
+import type { LyricsDraftGenerator, LyricsDraftInput } from "@/lyrics/types";
 
 /**
  * Wraps a real (Gemini) compiler/evaluator so that in development, a failure falls back to the
@@ -66,6 +67,32 @@ export function wrapEvaluatorWithDevFallback(real: PromptEvaluator, mock: Prompt
         );
         wrapper.metadata = mock.metadata;
         return mock.evaluate(input);
+      }
+    },
+  };
+  return wrapper;
+}
+
+export function wrapLyricsDraftGeneratorWithDevFallback(
+  real: LyricsDraftGenerator,
+  mock: LyricsDraftGenerator,
+): LyricsDraftGenerator {
+  const wrapper: LyricsDraftGenerator = {
+    metadata: real.metadata,
+    async draft(input: LyricsDraftInput) {
+      try {
+        const result = await real.draft(input);
+        wrapper.metadata = real.metadata;
+        return result;
+      } catch (error) {
+        if (process.env.NODE_ENV === "production") throw error;
+        console.warn(
+          `[GeminiLyricsDraftGenerator] draft failed, falling back to Mock in development: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        wrapper.metadata = mock.metadata;
+        return mock.draft(input);
       }
     },
   };

@@ -329,29 +329,42 @@ engine mapping and field ownership recorded in `docs/PHASE_LOG.md`'s Phase 4 ent
 
 ## Phase 5 — Advanced lyrics
 
-Status: `TODO`
+Status: `DONE` (first-slice scope, live-verified)
 
 ### Features
 
-- Theme
-- Ideation
-- Draft A/B/C
-- Melody fit
-- Revision
-- Direct/simple mode
-- User know-how selection
-- Korean, Japanese, and English prosody profile selection
-- Singer/character profile
-- Story viewpoint
-- Locked lines
-- Diff
+- [x] Draft A/B/C — `LyricsDraftGenerator` (`src/lyrics/`), Mock + Gemini, produces 3 genuinely
+  different drafts per `POST /api/projects/{id}/lyrics/draft` (ADR-033).
+- [x] Direct/simple mode — `LyricsDesignSpec.mode` (Phase 1 schema); the generator/validator now
+  enforce it produces zero techniques, live-verified against real Gemini output.
+- [x] User know-how selection — `knowHowIntensity`/`selectedTechniques`/`excludedTechniques`
+  (Phase 1 schema); the generator reads them, the validator enforces them.
+- [x] Locked lines — `lockedLines` (Phase 1 schema); the validator requires every draft to include
+  them verbatim.
+- [x] Diff — `src/lib/diffLines.ts` (LCS-based, no new dependency), shown in `ProjectEditor.tsx`
+  before applying a chosen draft.
+- [ ] Theme / Ideation / Melody fit / Revision *screens* — `workflowStage` (Phase 1 schema) exists
+  and advances to `"draft"` when a draft is applied, but there's no dedicated screen per stage yet
+  — deferred to the Phase 2-tail UI pass (same category of gap as Phase 2's deferred reference/
+  deliberate-differences editing).
+- [ ] Korean, Japanese, and English prosody profile selection / Singer-character profile / Story
+  viewpoint — `culturalProfile`/`pointOfView`/`speaker`/`addressee` (Phase 1 schema) exist and the
+  Gemini template reads them when set, but there's no UI form control for them yet — same deferred
+  category.
 
 ### Definition of done
 
-- Direct mode does not inject metaphor by default.
-- Selected techniques are traceable.
-- Excluded techniques do not appear.
-- Locked lines survive compile and revision.
+- [x] Direct mode does not inject metaphor by default. — live-verified: a real Gemini call with
+  `mode: "direct"` returned 3 drafts, all with `techniquesUsed: []`, while still producing genuinely
+  different, on-theme creative lyrics for each.
+- [x] Selected techniques are traceable. — `validateLyricsDraftSet()` requires every reported
+  technique to be a verbatim member of `selectedTechniques`; live testing caught real Gemini output
+  reporting an unselected technique name, which is now rejected with a clear error (see
+  `docs/TROUBLESHOOTING.md`).
+- [x] Excluded techniques do not appear. — validated the same way; unit-tested.
+- [x] Locked lines survive compile and revision. — the existing Stage E check
+  (`compiler/pipeline.ts`) already covered compile; `validateLyricsDraftSet()` extends the same
+  guarantee to the drafting step, live-verified against real Gemini output for a 2-line-locked spec.
 
 ---
 

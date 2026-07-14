@@ -602,6 +602,35 @@ the engines themselves rather than a second content-editing UI.
 
 ---
 
+## ADR-033 — Lyrics drafting: A/B/C generator + deterministic validation, not a 5-step wizard
+
+- Status: Accepted
+- Date: 2026-07-14
+
+### Decision
+
+Phase 5's first slice adds a `LyricsDraftGenerator` (Mock + Gemini, same swap/dev-fallback pattern
+as `PromptCompiler`/`PromptEvaluator`) that produces 3 lyric drafts (A/B/C) per
+`docs/METHODOLOGY.md`'s "compare several drafts before picking a line" practice, plus
+`validateLyricsDraftSet()` — a deterministic backstop checking every draft against
+`lyricsDesign.lockedLines`, `excludedTechniques`, and direct/simple mode's zero-technique rule.
+`LyricsDesignSpec` already had every field this needed (`mode`, `knowHowIntensity`,
+`selectedTechniques`/`excludedTechniques`, `culturalProfile`, `pointOfView`, `speaker`/`addressee`,
+`lockedLines`, `workflowStage`) since Phase 1 — this slice is the generation mechanism, not new
+schema. The full Theme→Ideation→Draft→Melody-fit→Revision wizard (dedicated screens per stage) is
+deferred to the Phase 2-tail UI pass.
+
+### Consequence (live-verified correctness fix)
+
+Live testing against real Gemini output found it reporting technique names the user never
+selected (e.g. `"직관적 대조"` when only `"공감각적 비유"` was chosen in `selectedTechniques`) — a real
+threat to "selected techniques are traceable" (IMPLEMENTATION_PLAN.md Phase 5 Definition of Done).
+`validateLyricsDraftSet()` now additionally requires every `techniquesUsed` entry to be a verbatim
+member of `selectedTechniques`, rejecting the draft set with a clear error otherwise; the system
+instruction was also strengthened to state this explicitly. See `docs/TROUBLESHOOTING.md`.
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:

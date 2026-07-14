@@ -347,3 +347,104 @@ See `DECISIONS.md` ADR-031 and ADR-032.
 - Turning an accepted suggestion into an automatic spec edit — deferred to Phase 6 (Revision Lab).
 - Everything already pending from Phase 0-3 (DB hosting, deployment platform, budget-limit policy,
   logging/observability, app-level rate limiting, background jobs) is still pending.
+
+---
+
+## Phase 5 — Advanced lyrics (first slice)
+
+- Date: 2026-07-14
+- Status: **DONE (first-slice scope), live-verified**
+
+### 한글 요약
+
+- **무엇을 만들었나**: 가사 초안 A/B/C를 생성하는 `LyricsDraftGenerator`(Mock + Gemini 둘 다)를 새로
+  구현했습니다. `LyricsDesignSpec`은 Phase 1부터 이미 `mode`, `knowHowIntensity`, `selectedTechniques`/
+  `excludedTechniques`, `lockedLines` 등 필요한 필드를 다 갖고 있었기 때문에, 이번 슬라이스는 스키마가
+  아니라 그 필드를 실제로 읽어서 초안을 만드는 메커니즘 자체를 채웠습니다. Draft A는 기법 없이 직설적인
+  버전, Draft B는 선택한 기법 하나를 얹은 버전, Draft C는 더 과감하게 여러 기법을 쓴 버전입니다. 새
+  `POST /api/projects/{id}/lyrics/draft` 엔드포인트가 생성 후 `validateLyricsDraftSet()`으로 검증한
+  결과만 반환합니다(저장은 하지 않음). 프로젝트 편집기에는 "Generate Drafts" 버튼, 초안별 사용된 기법
+  표시, 그리고 선택 시 현재 가사와의 라인 단위 diff(`src/lib/diffLines.ts`, 새 의존성 없이 LCS로 직접
+  구현)를 보여준 뒤 확인/취소하는 흐름을 추가했습니다. 적용하면 `workflowStage`가 `"draft"`로 바뀝니다.
+- **결정론적 검증이 진짜 보장을 만듦**: `validateLyricsDraftSet()`이 Mock이든 Gemini든 상관없이 (1)
+  잠근 가사 줄이 모든 초안에 글자 그대로 있는지, (2) 제외한 기법이 안 쓰였는지, (3) 직설/simple 모드에서
+  기법이 하나도 없는지, (4) 보고된 기법이 전부 사용자가 실제로 선택한 기법 목록에 있는지(라이브 테스트로
+  발견한 버그, 아래 참고) 확인합니다. 위반 시 400 에러로 명확한 이유를 반환합니다 — 프롬프트 지시만
+  믿지 않고 코드로 강제한다는 이 프로젝트의 기존 원칙(Phase 3/4와 동일 패턴)을 그대로 이어갔습니다.
+- **라이브 검증에서 실제 버그 발견**: 실제 Gemini 호출로 `selectedTechniques: ["공감각적 비유"]`만
+  선택했는데, 응답이 `techniquesUsed: ["직관적 대조"]`처럼 사용자가 고르지 않은 기법 이름을 보고하는
+  것을 확인했습니다. "선택한 기법만 추적 가능해야 한다"는 요구를 어기는 실제 버그였고,
+  `validateLyricsDraftSet()`에 "보고된 기법은 반드시 `selectedTechniques`의 원문 그대로여야 한다"는
+  검사를 추가하고 시스템 프롬프트에도 이 제약을 명시해 수정했습니다. 재검증 결과 이후 위반(빈 문자열을
+  기법으로 보고한 사례)도 올바르게 거부되는 것을 확인했습니다.
+- **직설 모드 확인**: 실제 Gemini 호출로 `mode: "direct"` 스펙에 대해 3개 초안 전부
+  `techniquesUsed: []`이면서도 주제에 맞는 완성도 있는 가사가 나오는 것을 확인했습니다 — "직설/simple
+  가사는 열등한 대안이 아니라 완전한 선택지"라는 CLAUDE.md 원칙이 실제로 지켜짐을 검증했습니다.
+- **남은 것**: Theme/Ideation/Melody-fit/Revision을 각각의 화면으로 나누는 5단계 위저드, 그리고
+  화자/시점/문화권(`culturalProfile`/`pointOfView`/`speaker`/`addressee`) 선택 UI는 아직 없습니다
+  (스키마와 생성기는 이미 그 필드들을 읽지만, 입력할 폼 컨트롤이 없음) — 다음 "Phase 2 후반 UI" 작업으로
+  넘어갑니다.
+
+### What shipped
+
+- `LyricsDraft`/`LyricsDraftSet` domain types (`src/domain/lyrics/draft.ts`, new).
+- `LyricsDraftGenerator` interface (`src/lyrics/types.ts`) mirroring `PromptCompiler`'s shape.
+- Mock generator (`src/lyrics/mockLyricsDraftGenerator.ts` + `src/llm/mock/lyricsDraftBuilder.ts`):
+  fully deterministic — Draft A never uses a technique, B uses one from `selectedTechniques` minus
+  `excludedTechniques`, C uses the rest; direct/simple mode always yields zero techniques across
+  all three.
+- Gemini generator (`src/lyrics/geminiLyricsDraftGenerator.ts` + new
+  `src/llm/gemini/prompts/lyrics-draft.system.md`), same constructor/metadata pattern as
+  `GeminiPromptCompiler`.
+- `validateLyricsDraftSet()` (`src/lyrics/validateDraftSet.ts`) — the deterministic backstop
+  described above.
+- `src/lib/lyricsDeps.ts` — same Gemini-if-configured / dev-fallback-wrapped / Mock selection
+  pattern as `compilerDeps.ts`; `wrapLyricsDraftGeneratorWithDevFallback` added to
+  `src/llm/devFallback.ts` reusing the mutate-metadata-per-call fix from Phase 3.
+- New `POST /api/projects/{id}/lyrics/draft` route — ownership-checked, generates + validates,
+  returns `{drafts}` or 400 with validation errors.
+- `src/lib/diffLines.ts` — LCS-based line diff, no new dependency.
+- `ProjectEditor.tsx`: "Generate Drafts (A / B / C)" button, per-draft techniques/notes display,
+  "Use this draft" → inline diff → "Confirm & Save" / "Cancel", saved via the existing PATCH with
+  `lyricsDesign.workflowStage` set to `"draft"`.
+- 21 new unit tests (120 total, up from 99): Mock generator, `validateLyricsDraftSet` (including
+  the technique-traceability case), `diffLines`, and the new API route's ownership cases.
+
+### Live verification
+
+Against the already-running Docker Postgres and dev server:
+
+- Generated drafts with Mock for the existing (direct-mode, no techniques selected) test project —
+  confirmed all 3 drafts had `techniquesUsed: []`.
+- Adjusted the project to a non-direct mode with one selected technique, generated again — confirmed
+  the technique appeared in `techniquesUsed` for the drafts that used it and only that technique.
+- Applied a draft, confirmed the diff view matched the actual line changes, confirmed save +
+  `workflowStage: "draft"` persisted correctly.
+- One real `POST .../lyrics/draft` call to Gemini for a `mode: "direct"` spec — confirmed 0
+  techniques across all 3 drafts with genuinely different, on-theme lyrics.
+- A second real Gemini call with `selectedTechniques: ["공감각적 비유"]` surfaced the
+  technique-traceability bug (`techniquesUsed: ["직관적 대조"]`, never selected) — fixed and
+  re-verified the fix rejects a subsequent violation correctly (see `docs/TROUBLESHOOTING.md`).
+
+### Verification at time of this entry
+
+- `pnpm typecheck`, `pnpm lint` — pass
+- `pnpm test` — 120/120 pass
+- `pnpm build` — pass, new `/api/projects/[projectId]/lyrics/draft` route compiled
+- Live walkthrough — pass (see above)
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-033.
+
+### Known gaps carried forward
+
+- Dedicated Theme / Ideation / Melody-fit / Revision screens — deferred to the Phase 2-tail UI
+  pass.
+- UI for `culturalProfile`/`pointOfView`/`speaker`/`addressee`/`selectedTechniques`/
+  `excludedTechniques` editing — schema and generator already support these fields; no form
+  control yet.
+- A dedicated repair pass for lyrics drafts — a hard-constraint violation is rejected with a clear
+  error rather than auto-repaired; the main pipeline's Stage G repair pass is unrelated.
+- Everything already pending from Phase 0-4 (DB hosting, deployment platform, budget-limit policy,
+  logging/observability, app-level rate limiting, background jobs) is still pending.

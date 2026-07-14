@@ -6,6 +6,8 @@ import type { SongDesignSpec } from "@/domain/songDesignSpec/schema";
 import type { LyricsMode } from "@/domain/songDesignSpec/lyrics";
 import type { MusicAIPromptPackage } from "@/domain/promptPackage/schema";
 import type { CompositionTheorySpec } from "@/domain/songDesignSpec/theory";
+import type { LyricsDraft } from "@/domain/lyrics/draft";
+import { diffLines } from "@/lib/diffLines";
 
 const LYRICS_MODES: LyricsMode[] = [
   "simple_direct",
@@ -64,6 +66,11 @@ export function ProjectEditor({ project }: { project: Project }) {
   const [theory, setTheory] = useState<CompositionTheorySpec | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+
+  const [drafts, setDrafts] = useState<LyricsDraft[] | null>(null);
+  const [drafting, setDrafting] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const [diffTarget, setDiffTarget] = useState<LyricsDraft | null>(null);
 
   function buildSpecFromForm(base: SongDesignSpec): SongDesignSpec {
     return {
@@ -165,6 +172,43 @@ export function ProjectEditor({ project }: { project: Project }) {
     const { project: updated } = await response.json();
     setCurrent(updated);
     await handleAnalyze();
+  }
+
+  async function handleGenerateDrafts() {
+    setDrafting(true);
+    setDraftError(null);
+    setDiffTarget(null);
+
+    const response = await fetch(`/api/projects/${project.id}/lyrics/draft`, { method: "POST" });
+
+    setDrafting(false);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: "Draft generation failed." }));
+      setDraftError(body.error ?? "Draft generation failed.");
+      return;
+    }
+    const { drafts: newDrafts } = await response.json();
+    setDrafts(newDrafts);
+  }
+
+  async function handleApplyDraft(draft: LyricsDraft) {
+    const baseSpec = buildSpecFromForm(current.spec);
+    const updatedSpec: SongDesignSpec = {
+      ...baseSpec,
+      lyricsDesign: { ...baseSpec.lyricsDesign, originalLyrics: draft.lyrics, workflowStage: "draft" },
+    };
+
+    const response = await fetch(`/api/projects/${project.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updatedSpec),
+    });
+    if (!response.ok) return;
+
+    const { project: updated } = await response.json();
+    setCurrent(updated);
+    setOriginalLyrics(draft.lyrics);
+    setDiffTarget(null);
   }
 
   async function copyToClipboard(key: string, text: string) {
@@ -291,6 +335,9 @@ export function ProjectEditor({ project }: { project: Project }) {
         <button onClick={handleAnalyze} disabled={analyzing}>
           {analyzing ? "Analyzing..." : "Analyze (theory check)"}
         </button>
+        <button onClick={handleGenerateDrafts} disabled={drafting}>
+          {drafting ? "Drafting..." : "Generate Drafts (A / B / C)"}
+        </button>
         <a href={`/api/projects/${project.id}/export/txt`}>Export TXT</a>
         <a href={`/api/projects/${project.id}/export/json`}>Export JSON</a>
       </div>
@@ -298,6 +345,49 @@ export function ProjectEditor({ project }: { project: Project }) {
       {saveError && <p role="alert" style={{ color: "var(--color-warning)" }}>{saveError}</p>}
       {compileError && <p role="alert" style={{ color: "var(--color-warning)" }}>{compileError}</p>}
       {analyzeError && <p role="alert" style={{ color: "var(--color-warning)" }}>{analyzeError}</p>}
+      {draftError && <p role="alert" style={{ color: "var(--color-warning)" }}>{draftError}</p>}
+
+      {drafts && (
+        <section>
+          <h2>Lyrics drafts</h2>
+          {drafts.map((draft) => (
+            <article key={draft.id} style={{ border: "1px solid currentColor", padding: "1rem", marginBottom: "1rem" }}>
+              <h3>Draft {draft.label}</h3>
+              <p style={{ whiteSpace: "pre-wrap" }}>{draft.lyrics}</p>
+              <p style={{ fontSize: "0.85rem" }}>
+                <strong>Techniques used:</strong> {draft.techniquesUsed.length > 0 ? draft.techniquesUsed.join(", ") : "none"}
+                {" — "}
+                {draft.notes}
+              </p>
+              <button onClick={() => setDiffTarget(draft)}>Use this draft</button>
+
+              {diffTarget?.id === draft.id && (
+                <div style={{ marginTop: "0.75rem", borderTop: "1px dashed currentColor", paddingTop: "0.75rem" }}>
+                  <p>
+                    <strong>Diff vs. current lyrics:</strong>
+                  </p>
+                  {diffLines(originalLyrics, draft.lyrics).map((line, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        color:
+                          line.type === "added" ? "var(--color-success)" : line.type === "removed" ? "var(--color-warning)" : "inherit",
+                      }}
+                    >
+                      {line.type === "added" ? "+ " : line.type === "removed" ? "- " : "  "}
+                      {line.text}
+                    </div>
+                  ))}
+                  <div style={{ marginTop: "0.5rem", display: "flex", gap: "0.5rem" }}>
+                    <button onClick={() => handleApplyDraft(draft)}>Confirm & Save</button>
+                    <button onClick={() => setDiffTarget(null)}>Cancel</button>
+                  </div>
+                </div>
+              )}
+            </article>
+          ))}
+        </section>
+      )}
 
       {theory && (
         <section>

@@ -234,3 +234,37 @@ script's own terminal encoding, not the application — the actual persisted dat
 unaffected (confirmed by the lock test passing: the exact hand-written text was preserved and
 returned correctly through the JSON API on re-analyze).
 
+---
+
+## Phase 5 (lyrics drafting)
+
+### Gemini reported a technique the user never selected
+
+**Symptom:** A real `POST /api/projects/{id}/lyrics/draft` call, with
+`lyricsDesign.selectedTechniques: ["공감각적 비유"]` and nothing else selected, returned a draft with
+`techniquesUsed: ["직관적 대조"]` — a technique name that was never in `selectedTechniques`.
+
+**Cause:** `lyrics-draft.system.md` told Gemini to report which techniques a draft "genuinely uses,"
+but didn't forbid it from applying its own judgment about which named technique best describes what
+it wrote, even when that name wasn't one the user actually chose. The model appears to have picked
+what it considered the most accurate label for the effect it produced, rather than treating
+`selectedTechniques` as a closed set to draw from.
+
+**Fix:** Added a check to `validateLyricsDraftSet()`
+(`src/lyrics/validateDraftSet.ts:36`): every entry in `techniquesUsed` must be a verbatim member of
+`lyricsDesign.selectedTechniques`, or the whole draft set is rejected with a 400 listing the
+offending technique. Also strengthened `lyrics-draft.system.md` to state the constraint explicitly
+("every entry in `techniquesUsed` must come verbatim from `lyricsDesign.selectedTechniques`... never
+report a technique name the user didn't select"). Re-ran the same live call afterward: a later
+response reported a stray `" "` as a technique and was correctly rejected by the new check. General
+lesson: when a schema-validated LLM field is supposed to be drawn from a fixed, user-provided set
+(not freely generated text), validate set-membership explicitly — schema validation alone (the
+field is *a string*) doesn't catch *the wrong string*, and a system-prompt instruction alone doesn't
+reliably stop it either. This is the same "prompt instructions are hope, deterministic checks are
+the guarantee" pattern as Phase 4's dismissed-warnings filtering and Phase 3's metadata-mutation
+fix.
+
+No other new environment/tooling issues this phase — the Windows Git Bash `/tmp` path-translation
+issue from Phase 0-3 (see above) did not recur, since this phase's live verification used direct
+`curl`/dev-server calls rather than file round-tripping through `node -e`.
+
