@@ -2,8 +2,9 @@ import { test, expect } from "@playwright/test";
 
 /**
  * Landing page smoke test: the app's front door isn't covered by happy-path.spec.ts (which starts
- * directly at /signup), so this confirms Sign up / Log in actually navigate correctly and that
- * both scroll sections render.
+ * directly at /signup), so this confirms Sign up / Log in actually navigate correctly, that all
+ * sections render, and that the no-login demo (now embedded in Hero, visible without scrolling)
+ * works end-to-end.
  */
 test("landing page navigates to signup and login", async ({ page }) => {
   await page.goto("/");
@@ -17,13 +18,18 @@ test("landing page navigates to signup and login", async ({ page }) => {
   await expect(page).toHaveURL(/\/signup$/);
 });
 
-test("landing page renders all 5 sections", async ({ page }) => {
+test("landing page renders all sections", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /One idea/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: /Ask two AIs for the same song/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: /What actually happens between your idea/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: /Built on real songwriting craft/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Try it right now/ })).toBeVisible();
+});
+
+test("the no-login demo is visible without scrolling", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByLabel(/Describe your musical idea/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Generate" })).toBeVisible();
 });
 
 test("landing page respects prefers-reduced-motion", async ({ page }) => {
@@ -47,7 +53,7 @@ test("landing page lets a visitor generate a prompt without logging in", async (
   await page.getByLabel(/Describe your musical idea/).fill("A bittersweet farewell at a train station.");
   await page.getByRole("button", { name: "Generate" }).click();
 
-  await expect(page.getByText(/Sign up/).last()).toBeVisible();
+  await expect(page.getByText(/unlock Safe \/ Balanced \/ Bold/)).toBeVisible();
   await expect(page).not.toHaveURL(/\/login/);
   await expect(page.getByText(/Style:/)).toBeVisible();
   await expect(page.getByText(/Lyrics:/)).toBeVisible();

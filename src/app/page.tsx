@@ -3,7 +3,6 @@ import { Hero } from "./Hero";
 import { Problem } from "./Problem";
 import { Service } from "./Service";
 import { Craft } from "./Craft";
-import { CTA } from "./CTA";
 
 export default function Home() {
   return (
@@ -12,7 +11,6 @@ export default function Home() {
       <Problem />
       <Service />
       <Craft />
-      <CTA />
     </div>
   );
 }

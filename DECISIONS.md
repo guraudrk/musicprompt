@@ -843,6 +843,48 @@ to keep content clear of the old fixed bar) was removed since it's no longer nee
 
 ---
 
+## ADR-038 — No-login demo moved into Hero (above the fold); dedicated CTA section removed
+
+- Status: Accepted
+- Date: 2026-07-15
+
+### Decision
+
+The user asked to move the actual prompt-writing demo into the screen that's visible immediately
+on landing, with the explanatory sections (Problem/Service/Craft) following below as a scrolled
+list. `DemoForm` (unchanged component and `/api/demo/compile` route) now renders inside `Hero.tsx`,
+directly below the headline/description and above the Sign up/Log in links and the scroll hint.
+The previously separate `CTA.tsx`/`CTA.module.css` section (which only ever wrapped `DemoForm` at
+the bottom of the page) is now redundant and was deleted rather than kept as a second, duplicate
+copy of the same form.
+
+`Hero.module.css` changed from `height: 100vh` with absolutely-positioned, bottom-anchored content
+and a separately-fixed CTA bar (ADR-037's fix) to `min-height: 100vh` with the content column laid
+out in normal flow, centered via flexbox. This is simpler and more robust than the previous
+bottom-anchored-with-manual-margin approach — it doesn't need per-breakpoint `margin-bottom` hacks
+to keep content clear of a fixed element, and it naturally accommodates the demo form's variable
+height (empty vs. showing a generated result) without needing to know that height in advance.
+Sign up/Log in changed from large pill buttons to small underlined text links, since the demo's
+own "Generate" button is now the primary call to action on this screen; the pill-button treatment
+would have visually competed with it.
+
+### Reason
+
+Live-verified at 1280×720, 1440×900 (typical laptop heights), and 375×812 (mobile) that the full
+headline + description + demo form + auth links + scroll hint fit within a single viewport at
+every size tested, with the scroll-hint chevron still visible confirming there's more to scroll to
+— the core ask ("visible as soon as you land, no scrolling required") is met, not just approximated.
+
+### Consequence
+
+`tests/e2e/landing.spec.ts` updated: removed the "Try it right now" heading assertion (that section
+no longer exists), added a dedicated case asserting the demo's textarea and Generate button are
+visible immediately on `page.goto("/")` with no scroll action first, and changed the post-generate
+assertion from a bare `getByText(/Sign up/).last()` (ambiguous now that "Sign up" appears twice in
+the same section — the auth link and the demo's upsell link) to the specific upsell sentence text.
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:

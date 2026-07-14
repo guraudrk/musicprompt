@@ -801,4 +801,80 @@ over Tailwind, the fixed-CTA-bar bug).
 - Keyboard navigation through the 5 sections wasn't explicitly re-checked this slice.
 - Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first/second slice is still
   pending.
-- Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first slice is still pending.
+
+---
+
+## Phase 7 (fourth slice) — No-login demo moved above the fold
+
+- Date: 2026-07-15
+- Status: **DONE (first-slice scope), live-verified**
+
+### 한글 요약
+
+- **무엇을 했나**: 사용자가 "실제로 프롬프트 적는 부분을 접속하자마자 보이는 화면에 넣고, 밑부분은
+  설명을 나열하는 식으로 하자"고 요청했습니다. 그동안 데모(`DemoForm`)는 페이지 맨 아래, 스크롤을 다
+  내려야 나오는 별도의 CTA 섹션에 있었는데, 이번엔 아예 히어로 섹션 안으로 옮겨서 접속하자마자(스크롤
+  없이) 바로 아이디어를 입력하고 "Generate"를 누를 수 있게 만들었습니다. 기존에 히어로에 있던 "Sign
+  up/Log in" 큰 알약 버튼은 이제 데모의 "Generate" 버튼이 주(主) 행동이 되었으므로, 그보다 눈에 덜
+  띄는 작은 텍스트 링크로 바꿨습니다. 아래에 있던 별도의 CTA 섹션(`CTA.tsx`)은 데모를 중복으로 갖고
+  있을 이유가 없어져서 통째로 삭제했습니다.
+- **레이아웃 방식도 함께 개선**: 기존 히어로는 `height: 100vh` + 텍스트를 화면 하단에 절대좌표로
+  고정 + 별도로 떠 있는 CTA 바 조합이었는데, 이번에 `min-height: 100vh` + 일반적인 flexbox 중앙
+  정렬로 바꿨습니다. 이러면 데모 폼처럼 "결과가 나오기 전/후로 높이가 달라지는" 콘텐츠를 넣어도 화면
+  깨짐 없이 자연스럽게 적응합니다(이전 방식은 콘텐츠 높이가 고정적이라고 가정하고 화면 크기별로
+  `margin-bottom` 값을 일일이 맞춰야 했음).
+- **실제로 확인한 것**: 1280×720, 1440×900(일반적인 노트북 화면), 375×812(모바일) 전부에서 헤드라인
+  + 설명 + 데모 폼 + 로그인 링크 + 스크롤 힌트까지 한 화면 안에 다 들어가는 것을 스크린샷으로
+  확인했습니다 — "말만 그렇다"가 아니라 실제로 스크롤 없이 보인다는 걸 검증했습니다.
+- **테스트도 같이 수정**: 이제 사라진 "Try it right now" 섹션을 확인하던 테스트를 지우고, "스크롤
+  없이 데모가 보이는지" 확인하는 테스트를 새로 추가했습니다. 또 기존 테스트의
+  `getByText(/Sign up/).last()` 부분이 이제 같은 섹션 안에 "Sign up"이 두 번(인증 링크, 데모 결과
+  안내 문구) 나오면서 애매해질 수 있어서, 더 구체적인 문구로 바꿨습니다.
+
+### What shipped
+
+- `src/app/Hero.tsx` — now renders `DemoForm` directly below the headline/description, with small
+  underlined Sign up/Log in text links and `ScrollHint` below that.
+- `src/app/Hero.module.css` — `.hero` changed from `height: 100vh` + absolutely-positioned
+  bottom-anchored `.heroContent` + a separately-`position: absolute` `.ctaBar`, to `min-height: 100vh`
+  with `.heroContent` as a normal-flow flex column, centered via the section's own
+  `align-items`/`justify-content`. `DemoForm`'s styles (`.demoForm`, `.demoTextarea`, etc.) moved
+  here from the deleted `CTA.module.css`.
+- `src/app/DemoForm.tsx` — import path updated to `./Hero.module.css` (component itself unchanged).
+- `src/app/CTA.tsx` / `src/app/CTA.module.css` — deleted (redundant now that `DemoForm` lives in
+  Hero).
+- `src/app/page.tsx` — now a 4-section composition: Hero(+demo)/Problem/Service/Craft.
+- `tests/e2e/landing.spec.ts` — removed the "Try it right now" heading case; added
+  "the no-login demo is visible without scrolling"; fixed the post-generate assertion to target the
+  specific upsell sentence instead of an now-ambiguous `getByText(/Sign up/).last()`.
+
+### Live verification
+
+Against the already-running dev server (Docker Postgres was not running this session — not needed,
+since neither the landing page nor the Mock-only demo touch the database):
+
+- Screenshots at 1280×720, 1440×900, and 375×812 confirmed the entire hero (headline, description,
+  demo form, auth links, scroll hint) fits within one viewport at every size, with the scroll-hint
+  chevron visible confirming there's still more to scroll to below.
+- Screenshots of the Problem/Craft sections below the fold confirmed no overlap or regressions from
+  the layout change.
+- Confirmed no horizontal overflow at 375px width after scrolling the full page.
+- All 5 Playwright cases in `landing.spec.ts` pass, including the new above-the-fold case.
+
+### Verification at time of this entry
+
+- `pnpm typecheck`, `pnpm lint`, `pnpm build` — pass
+- `pnpm test` — 123/123 pass (unchanged)
+- `pnpm exec playwright test tests/e2e/landing.spec.ts` — 5/5 pass
+- Live walkthrough — pass (see above)
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-038.
+
+### Known gaps carried forward
+
+- The rest of Phase 7 (Sound Seed Orb, provider selector, Lab preview, app section, Lighthouse
+  baseline) is still open.
+- Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first/second/third slice is
+  still pending.

@@ -1,7 +1,8 @@
 /*
- * Landing page (Phase 7). Composed of 5 section components (Hero/Problem/Service/Craft/CTA), each
- * with its own co-located CSS module — see DECISIONS.md for the 5-section restructure and the
- * choice to keep CSS Modules over Tailwind. This file only holds the shared scroll root.
+ * Landing page (Phase 7). Composed of 4 section components (Hero/Problem/Service/Craft), each with
+ * its own co-located CSS module. The no-login demo (DemoForm) lives inside Hero itself — visible
+ * immediately on landing, not after scrolling past the explanatory sections below it — see
+ * DECISIONS.md ADR-038. This file only holds the shared scroll root.
  */
 
 .scrollContainer {

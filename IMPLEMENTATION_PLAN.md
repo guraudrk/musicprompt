@@ -412,8 +412,9 @@ Status: `IN PROGRESS` (first slice done, live-verified — see below)
 - [ ] Original Sound Seed Orb — not built yet; the hero background is real photographic art
   (Beethoven portraits) rather than the originally-planned original generative orb visual.
 - [x] Live transformation demo — `src/app/DemoForm.tsx` + `src/app/api/demo/compile/route.ts`: a
-  no-login textarea → Generate → real (Mock-only, by construction — see ADR-036) compiled result,
-  now the centerpiece of a dedicated `src/app/CTA.tsx` section.
+  no-login textarea → Generate → real (Mock-only, by construction — see ADR-036) compiled result.
+  Now embedded directly in `Hero.tsx` (ADR-038), visible immediately on landing without scrolling —
+  the dedicated `CTA.tsx` section that previously wrapped it was removed as redundant.
 - [x] Methodology story — `src/app/Craft.tsx` ("Built on real songwriting craft"): 3 cards on real
   `docs/METHODOLOGY.md`/`CLAUDE.md` principles (reference-is-function + the 3-difference gate,
   direct/simple lyrics as a complete option, locked lines survive every revision) — deliberately
@@ -421,12 +422,12 @@ Status: `IN PROGRESS` (first slice done, live-verified — see below)
 - [ ] Provider selector
 - [ ] Composition/Lyrics Lab preview
 - [ ] App section
-- [x] Final CTA — `src/app/CTA.tsx`, wrapping `DemoForm`. The page is now a 5-section composition
-  (Hero/Problem/Service/Craft/CTA — `src/app/page.tsx`); Hero's own Sign up/Log in pill bar +
-  fading scroll-hint chevron (`src/app/ScrollHint.tsx`) is scoped to the hero section itself
-  (`position: absolute`, not page-wide `fixed` — see ADR-037/Troubleshooting for why the original
-  fixed positioning broke once more sections existed below it) rather than persisting over every
-  section.
+- [x] Final CTA — folded into Hero (ADR-038): the demo *is* the primary call to action now, so it
+  lives above the fold rather than at the bottom of the page. The page is a 4-section composition
+  (Hero(+demo)/Problem/Service/Craft — `src/app/page.tsx`). Sign up/Log in are small text links
+  below the demo form; the fading scroll-hint chevron (`src/app/ScrollHint.tsx`) sits at the bottom
+  of the hero's normal content flow (no longer a page-wide `fixed`/`absolute` bar — see
+  ADR-037/ADR-038 and Troubleshooting for the layout history).
 
 ### Guardrails
 
@@ -590,7 +591,14 @@ Each requires official capability verification and tests.
     every section below it once there were 5 — changed to `position: absolute` scoped to the hero.
     All 123 unit tests still pass unchanged; `tests/e2e/landing.spec.ts` extended to assert all 5
     section headings render.
-11. **Next actual work**: the rest of Phase 7 (Sound Seed Orb, provider selector, Lab preview, app
+11. ~~Move the no-login demo above the fold, into Hero.~~ Done — ADR-038. `DemoForm` now renders
+    inside `Hero.tsx` directly; the dedicated `CTA.tsx` section was deleted. `Hero.module.css`
+    changed from absolute/fixed bottom-anchored positioning to normal-flow flexbox centering.
+    Live-verified at 1280×720/1440×900/375×812 that headline + description + demo form + auth
+    links + scroll hint all fit within one viewport at every size tested. `tests/e2e/landing.spec.ts`
+    updated (removed the now-gone "Try it right now" heading case, added a dedicated
+    above-the-fold-visibility case, fixed an ambiguous `getByText(/Sign up/).last()` assertion).
+12. **Next actual work**: the rest of Phase 7 (Sound Seed Orb, provider selector, Lab preview, app
     section, Lighthouse baseline) remains open; other candidates are Phase 6 (Revision Lab), the
     full 8/14-screen wizard (PRODUCT_SPEC §16), `contrastPlan`/`hookPlan`/`repetitionPlan` UI, or
     the lock-field UI for `compositionTheory.*Notes` (deferred since Phase 4). A budget-limit

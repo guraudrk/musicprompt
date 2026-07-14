@@ -1,11 +1,14 @@
 .hero {
   position: relative;
   width: 100%;
-  height: 100vh;
-  min-height: 32rem;
+  min-height: 100vh;
   overflow: hidden;
   background: #05060a;
   color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6rem 1.5rem 3rem;
 }
 
 .heroBackground {
@@ -57,23 +60,19 @@
 }
 
 .heroContent {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: relative;
   z-index: 1;
-  margin: 0 auto 15rem;
-  padding: 0 1.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
-  max-width: 40rem;
+  gap: 1.25rem;
+  width: 100%;
+  max-width: 30rem;
   text-align: center;
 }
 
 .headline {
-  font-size: 2.625rem;
+  font-size: 2.25rem;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: -0.01em;
@@ -83,61 +82,31 @@
   font-size: 0.9375rem;
   line-height: 1.6;
   color: rgba(255, 255, 255, 0.8);
-  max-width: 32rem;
+  max-width: 30rem;
 }
 
-.ctaBar {
-  /* Absolute (scoped to .hero, which is `position: relative`), not fixed to the viewport — with
-     5 sections now on the page, a page-wide fixed bar would overlap every section below Hero
-     instead of just scrolling away with it. See DECISIONS.md / TROUBLESHOOTING.md. */
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 3.75rem;
-  z-index: 2;
+.authLinks {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.5);
 }
 
-.ctaButtons {
-  display: flex;
-  gap: 0.9375rem;
-  flex-wrap: wrap;
-  justify-content: center;
+.authLinks a {
+  color: rgba(255, 255, 255, 0.75);
+  text-decoration: underline;
 }
 
-.ctaBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 3rem;
-  padding: 0 1.875rem;
-  border-radius: 1.5rem;
-  font-size: 1.125rem;
-  font-weight: 700;
+.authLinks a:hover {
   color: #ffffff;
-  transition: opacity 0.2s ease;
-}
-
-.ctaBtn:hover {
-  opacity: 0.85;
-}
-
-.ctaPrimary {
-  background: linear-gradient(90deg, var(--color-accent-crimson) 0%, var(--color-accent-gold) 100%);
-}
-
-.ctaSecondary {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.25);
 }
 
 .scrollHint {
   width: 1rem;
   height: 1.5rem;
   position: relative;
+  margin-top: 0.5rem;
   animation: scrollHintBounce 1.2s ease-in-out infinite;
   transition: opacity 0.25s ease;
 }
@@ -180,21 +149,98 @@
   }
 }
 
-@media screen and (max-width: 1261px) {
-  .headline {
-    font-size: 2.25rem;
-  }
+/* Demo form (src/app/DemoForm.tsx) — lives in the hero now so the prompt-writing experience is
+   visible immediately on landing, not after scrolling past explanatory sections. */
+.demoForm {
+  width: 100%;
+  max-width: 28rem;
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  text-align: left;
 }
 
-@media screen and (max-width: 1024px) {
-  .heroContent {
-    margin-bottom: 13.75rem;
+.demoLabel {
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.demoTextarea {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 0.875rem;
+  resize: vertical;
+}
+
+.demoButton {
+  align-self: flex-start;
+  height: 2.75rem;
+  padding: 0 1.5rem;
+  border-radius: 1.375rem;
+  border: none;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(90deg, var(--color-accent-crimson) 0%, var(--color-accent-gold) 100%);
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.demoButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.demoButton:not(:disabled):hover {
+  opacity: 0.85;
+}
+
+.demoError {
+  font-size: 0.8125rem;
+  color: var(--color-warning);
+}
+
+.demoResult {
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.demoUpsell {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.demoUpsell a {
+  color: var(--color-accent-gold);
+  text-decoration: underline;
+}
+
+@media screen and (max-width: 1261px) {
+  .headline {
+    font-size: 2rem;
   }
 }
 
 @media screen and (max-width: 640px) {
+  .hero {
+    padding: 5rem 1.25rem 2.5rem;
+  }
+
   .headline {
-    font-size: 1.75rem;
+    font-size: 1.625rem;
   }
 
   .heroDescription {
@@ -202,17 +248,10 @@
   }
 
   .heroContent {
-    margin-bottom: 12.5rem;
-    gap: 1.25rem;
+    gap: 1rem;
   }
 
-  .ctaBar {
-    bottom: 2.5rem;
-  }
-
-  .ctaBtn {
-    height: 2.75rem;
-    padding: 0 1.25rem;
-    font-size: 1rem;
+  .demoForm {
+    font-size: 0.75rem;
   }
 }

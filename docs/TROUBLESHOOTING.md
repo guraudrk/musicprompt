@@ -460,3 +460,17 @@ branch is "compute a value once, synchronously, from something already available
 that's a lazy `useState` initializer, not a `useEffect` — reserve the effect for the part that
 genuinely subscribes to an external, asynchronous event source.
 
+---
+
+## Phase 7 (fourth slice — demo moved above the fold)
+
+No new environment/tooling bugs or app defects this slice — typecheck, lint, 123 unit tests, build,
+and the full Playwright suite (`landing.spec.ts`, updated for the new structure) all passed on the
+first attempt after the refactor. Worth noting anyway: Docker Desktop wasn't running at the start of
+this session (the machine had been idle overnight), and the live verification proceeded without it
+— confirmed first that neither the landing page nor `/api/demo/compile` touch Prisma/Postgres at
+all, so a DB-less dev server was sufficient for this specific change. General lesson: before
+reflexively starting Docker/Postgres for "live verification," check whether the change actually
+exercises the database — not every UI change does, and Mock-only routes like the demo endpoint are
+deliberately designed not to.
+
