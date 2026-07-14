@@ -363,3 +363,54 @@ since browsers can normalize computed style value units/formatting. General less
 on a CSS computed value that represents "effectively zero" or "effectively instant," assert on the
 parsed numeric threshold, not the literal string the browser happens to serialize it as.
 
+---
+
+## Phase 7 (second slice — hero background art + anonymous demo)
+
+### `MockPromptCompiler`'s `fields.lyrics` came back empty in the anonymous demo
+
+**Symptom:** The first working version of the no-login demo returned a result where `Style` was
+populated but `Lyrics` was always blank.
+
+**Cause:** `buildCompilePayload` (`src/llm/mock/mockOutputBuilders.ts`) computes `fields.lyrics`
+exclusively from `spec.lyricsDesign.originalLyrics` + `spec.lyricsDesign.lockedLines` — it never
+reads `spec.northStar` at all. The demo route only set `northStar.audienceExperience` to the user's
+typed idea, so `lyricsDesign.originalLyrics` stayed `undefined` (its `buildDefaultSpec()` default),
+and `lyricsBody || undefined` evaluated to `undefined`.
+
+**Fix:** Also set `spec.lyricsDesign.originalLyrics = parsed.data.idea` in the demo route. General
+lesson: before wiring free-text user input into just one field of a multi-field spec, check every
+downstream consumer of that spec to see which of *its own* fields actually feeds the output the
+user will see — `northStar` and `lyricsDesign` are semantically related but structurally
+independent, and nothing enforces keeping them in sync automatically.
+
+### A second `aria-hidden` element broke an existing Playwright locator
+
+**Symptom:** `tests/e2e/landing.spec.ts`'s `prefers-reduced-motion` test, which previously located
+the scroll-hint via `page.locator("div[aria-hidden='true']").first()`, would have silently started
+asserting on the wrong element once `HeroBackground`'s own `aria-hidden="true"` wrapper div was
+added earlier in the DOM (before `ScrollHint`'s).
+
+**Fix:** Added explicit `data-testid="scroll-hint"` and `data-testid="hero-background"`/
+`"hero-image-layer"` attributes and switched the test to `page.getByTestId(...)`. General lesson:
+`.first()` on a generic attribute selector (like `aria-hidden='true'`, which legitimately applies
+to more than one purely-decorative element on a real page) is fragile the moment a second such
+element is added anywhere earlier in the DOM — prefer a `data-testid` scoped to the specific
+element under test as soon as more than one plausible match could exist.
+
+### `.locator()` chained onto the same element it was meant to filter
+
+**Symptom:** A first attempt at the hero reduced-motion check —
+`page.getByTestId("hero-image-layer").locator('[data-active="true"]')` — timed out after 30s
+waiting for an element that was actually already selected by the first half of the chain.
+
+**Cause:** Playwright's `.locator()` searches *descendants* of the current match; `data-active` and
+`data-testid="hero-image-layer"` are both attributes on the *same* `<div>`, not a parent/child
+relationship, so the chained locator was searching inside an element for a sibling attribute that
+would never appear as a descendant.
+
+**Fix:** Combined both conditions into one selector on the same element:
+`page.locator('[data-testid="hero-image-layer"][data-active="true"]')`. General lesson: chaining
+`.locator()` only makes sense for an actual ancestor→descendant relationship; to match multiple
+attributes on one element, put them in a single compound CSS selector instead.
+

@@ -405,12 +405,15 @@ Status: `IN PROGRESS` (first slice done, live-verified — see below)
 ### Features
 
 - [x] Dark immersive hero — `src/app/page.tsx`/`page.module.css`, full-viewport section, dark
-  gradient background (not tied to the light/dark theme toggle, matching this feature's intent),
-  centered headline + description.
-- [ ] Original Sound Seed Orb — not built yet; the hero currently uses a plain CSS gradient
-  background as a placeholder.
-- [ ] Live transformation demo — not built yet; the scroll-reveal section currently shows a static
-  mocked prompt-package-preview card (stylized JSON), not a real animated demo.
+  gradient background, centered headline + description, plus a responsive animated background
+  (`src/app/HeroBackground.tsx`): two verified public-domain Beethoven portraits cross-fading with
+  a slow Ken Burns zoom/pan every ~8s, behind a dark scrim so text stays readable (see ADR-036 for
+  image sourcing).
+- [ ] Original Sound Seed Orb — not built yet; the hero background is real photographic art
+  (Beethoven portraits) rather than the originally-planned original generative orb visual.
+- [x] Live transformation demo — `src/app/DemoForm.tsx` + `src/app/api/demo/compile/route.ts`: a
+  no-login textarea → Generate → real (Mock-only, by construction — see ADR-036) compiled result,
+  replacing the earlier static JSON preview card in the scroll-reveal section.
 - [ ] Methodology story
 - [ ] Provider selector
 - [ ] Composition/Lyrics Lab preview
@@ -426,9 +429,10 @@ Status: `IN PROGRESS` (first slice done, live-verified — see below)
   nypc.co.kr's teaser page; brand assets/copy/licensed font were not. See ADR-035. This override
   does not apply to the remaining Phase 7 items (Orb, live demo, methodology story, etc.), which
   are still free to diverge from NYPC as originally planned.
-- [x] Reduced motion — the scroll-hint bounce animation inherits the existing global
-  `prefers-reduced-motion` rule in `globals.css`; live-verified via Playwright
-  (`tests/e2e/landing.spec.ts`).
+- [x] Reduced motion — the scroll-hint bounce and hero Ken-Burns/cross-fade animations inherit the
+  existing global `prefers-reduced-motion` rule in `globals.css`; the cross-fade `setInterval` is
+  additionally skipped entirely in JS when reduced motion is on (not just sped up to ~0). Both
+  live-verified via Playwright (`tests/e2e/landing.spec.ts`).
 - [x] Mobile fallback — responsive breakpoints at 1261/1024/640px; live-verified via screenshot at
   375px width with no horizontal overflow.
 - [ ] Performance budget — not measured yet (no Lighthouse run this slice).
@@ -558,9 +562,19 @@ Each requires official capability verification and tests.
    ADR-035. `src/app/page.tsx`/`page.module.css`/`ScrollHint.tsx`; live-verified via screenshots
    (caught and fixed a real layout bug: the fixed CTA bar overlapped the last description item),
    mobile-width overflow check, reduced-motion check, and a new `tests/e2e/landing.spec.ts`.
-9. **Next actual work**: the rest of Phase 7 (Sound Seed Orb, live transformation demo,
-   methodology story, provider selector, Lab preview, app section, Lighthouse baseline) remains
-   open; other candidates are Phase 6 (Revision Lab), the full 8/14-screen wizard (PRODUCT_SPEC
-   §16), `contrastPlan`/`hookPlan`/`repetitionPlan` UI, or the lock-field UI for
-   `compositionTheory.*Notes` (deferred since Phase 4). A budget-limit policy decision is still
-   pending before Gemini usage caps can be implemented (see `DECISIONS.md`).
+9. ~~Add responsive animated hero background art and a no-login "try it now" demo.~~ Done —
+   ADR-036. `src/app/HeroBackground.tsx` (two verified public-domain Beethoven portraits,
+   cross-fade + Ken Burns, reduced-motion aware) and `src/app/api/demo/compile/route.ts` +
+   `src/app/DemoForm.tsx` (Mock-only by construction — never imports `compilePipelineDeps`, no
+   auth, no persistence). 123 unit tests (up from 120); live-verified via screenshots (desktop,
+   scroll-reveal with demo result, 375px mobile) and a new `tests/e2e/landing.spec.ts` case
+   proving the demo works with zero session cookies. Caught and fixed a real gap: the demo's
+   `fields.lyrics` came back empty because `MockPromptCompiler` derives it only from
+   `lyricsDesign.originalLyrics`, not `northStar` — see `docs/TROUBLESHOOTING.md`.
+10. **Next actual work**: the rest of Phase 7 (methodology story, provider selector, Lab preview,
+    app section, Lighthouse baseline) remains open; other candidates are Phase 6 (Revision Lab),
+    the full 8/14-screen wizard (PRODUCT_SPEC §16), `contrastPlan`/`hookPlan`/`repetitionPlan` UI,
+    or the lock-field UI for `compositionTheory.*Notes` (deferred since Phase 4). A budget-limit
+    policy decision is still pending before Gemini usage caps can be implemented, and real rate
+    limiting is still needed before any anonymous path could ever be allowed to call Gemini
+    (see `DECISIONS.md`).

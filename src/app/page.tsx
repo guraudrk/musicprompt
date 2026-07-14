@@ -1,11 +1,14 @@
 import Link from "next/link";
 import styles from "./page.module.css";
 import { ScrollHint } from "./ScrollHint";
+import { HeroBackground } from "./HeroBackground";
+import { DemoForm } from "./DemoForm";
 
 export default function Home() {
   return (
     <div className={styles.scrollContainer}>
       <section className={styles.hero}>
+        <HeroBackground />
         <div className={styles.heroContent}>
           <h1 className={styles.headline}>
             One idea.
@@ -34,14 +37,7 @@ export default function Home() {
       <section className={styles.detailSection}>
         <div className={styles.sectionContents}>
           <div className={styles.mediaWrap}>
-            <pre className={styles.previewCard}>
-              {`{
-  "strategy": "balanced",
-  "style": "warm indie-pop, mid-tempo, night drive",
-  "structure": ["Intro", "Verse", "Chorus", "Bridge", "Final Chorus"],
-  "lyrics": "..."
-}`}
-            </pre>
+            <DemoForm />
           </div>
 
           <dl className={styles.detailList}>

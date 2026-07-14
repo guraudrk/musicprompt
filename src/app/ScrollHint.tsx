@@ -18,5 +18,7 @@ export function ScrollHint() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  return <div className={styles.scrollHint} data-scrolled={scrolled} aria-hidden="true" />;
+  return (
+    <div className={styles.scrollHint} data-scrolled={scrolled} data-testid="scroll-hint" aria-hidden="true" />
+  );
 }

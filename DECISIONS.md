@@ -716,6 +716,65 @@ layout over. Fixed by adding equivalent bottom padding to `.detailSection`. See
 
 ---
 
+## ADR-036 — Anonymous "try it now" demo is Mock-only by construction; hero background art sourcing
+
+- Status: Accepted
+- Date: 2026-07-14
+
+### Decision
+
+The user asked to remove the login/signup requirement so visitors can use the prompt-writing
+feature immediately on scroll. This was flagged as conflicting with `CLAUDE.md` §6's MVP
+requirement ("basic authentication and project ownership") and Phase 2's tested "another user
+cannot access it" guarantee — per `docs/docs/CLAUDE_SELF_DIRECTED_OPERATING_MANUAL.md`, both
+"인증·보안 변경" and "비용이 큰 외부 API 실행" are explicit approval-gate categories. The user
+confirmed (via `AskUserQuestion`, then a follow-up message): keep the existing account/ownership
+system exactly as it is; add a separate, unauthenticated "try it now" demo alongside it.
+
+The demo (`src/app/api/demo/compile/route.ts`) is **Mock-compiler-only by construction, not by
+convention** — it hand-builds its own `CompilePipelineDeps` (`new MockPromptCompiler()`, `new
+MockPromptEvaluator()`, `new InMemoryProviderRegistry()`) instead of importing
+`compilePipelineDeps` from `src/lib/compilerDeps.ts`, which resolves to real Gemini whenever
+`GEMINI_API_KEY`/`GEMINI_MODEL`/`GEMINI_API_MODE` are configured (they are, in this project's
+`.env.local`). It also imports neither `@/lib/authz` nor any repository/`prisma` call — no auth
+dependency, no persistence, at all. `idea` is capped at 2000 characters via Zod.
+
+### Reason
+
+There is no rate-limiting infrastructure yet (a pending gap since Phase 0). An anonymous route
+that could reach a real, billable Gemini call would be an uncontrolled cost/abuse surface with no
+mitigation in place. Making it structurally impossible to reach Gemini (not importing the module
+that could resolve to it) removes the risk entirely without needing to build a rate limiter first —
+a "choose a low-risk default and record it" call per the self-directed manual, rather than a
+question requiring separate approval, since the account/ownership system itself is unchanged.
+
+### Hero background art sourcing
+
+Two Beethoven portraits, verified genuinely public domain (not merely "freely licensed by a modern
+photographer") via their Wikimedia Commons file pages and a `curl -I` confirming each resolves to a
+real `200 image/jpeg`, then self-hosted in `public/images/hero/`:
+
+- Joseph Karl Stieler, 1820 — artist died 1858 (PD-old-100-expired / CC-PD-Mark) —
+  source: `https://upload.wikimedia.org/wikipedia/commons/6/6f/Beethoven.jpg`
+- Joseph Willibrord Mähler, 1804–05 — artist died 1860 (public domain / CC-PD-Mark) —
+  source: `https://upload.wikimedia.org/wikipedia/commons/7/7b/Beethoven_3.jpg`
+
+Chosen after the user's original request (photos of Beethoven, Bob Dylan, the Beatles, Michael
+Jackson, BTS, Queen) was flagged as a real right-of-publicity/copyright risk for every name except
+Beethoven — living artists and estates/labels (Dylan, BTS especially) actively enforce image
+rights, and professional photography of all of them is copyrighted regardless. The user first
+narrowed to "Beethoven only," then relaxed to "appropriately musical and artistic," which these
+still satisfy.
+
+### Consequence (real gap found and fixed during implementation)
+
+`MockPromptCompiler`'s `fields.lyrics` derives only from `lyricsDesign.originalLyrics`/
+`lockedLines` (`src/llm/mock/mockOutputBuilders.ts`), not from `northStar` — the first version of
+the demo route only set `northStar.audienceExperience`, so every demo result silently had an empty
+"Lyrics" field. Fixed by also seeding `lyricsDesign.originalLyrics` with the user's typed idea.
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:

@@ -624,3 +624,89 @@ See `DECISIONS.md` ADR-035 (guardrail override, what was/wasn't reused, the padd
 - Everything already pending from Phase 0-5 + Phase 2-tail (DB hosting, deployment platform,
   budget-limit policy, logging/observability, app-level rate limiting, background jobs,
   `happy-path.spec.ts`'s Gemini-latency flake) is still pending.
+
+---
+
+## Phase 7 (second slice) — Animated hero background art + anonymous no-login demo
+
+- Date: 2026-07-14
+- Status: **DONE (first-slice scope), live-verified**
+
+### 한글 요약
+
+- **배경 이미지**: 사용자가 처음에 베토벤/밥 딜런/비틀즈/마이클 잭슨/BTS/퀸의 사진을 히어로 배경에
+  넣어달라고 요청했는데, 베토벤을 제외한 나머지는 전부 실제 법적 위험(생존 인물의 초상권, 사후에도
+  적극적으로 관리되는 이미지권, 그리고 거의 모든 사진 자체의 저작권)이 있다는 걸 먼저 설명드렸습니다.
+  사용자가 처음엔 "베토벤만", 나중엔 "적절히 음악적이고 예술적인 이미지"로 범위를 좁혀주셔서, 베토벤
+  초상화 2점(Stieler 1820년작, Mähler 1804-05년작)을 Wikimedia Commons에서 실제로 퍼블릭 도메인
+  라이선스 태그까지 확인하고 `curl`로 실제 이미지 응답까지 검증한 뒤 자체 서버에 다운로드해서 썼습니다
+  (ADR-036). 8초마다 서서히 두 그림이 전환되며 천천히 확대/이동하는 느낌(Ken Burns 효과)을 주고,
+  텍스트 가독성을 위해 어두운 그라데이션을 씌웠습니다.
+- **로그인 없이 바로 써보는 데모**: 사용자가 "로그인/회원가입을 없애고 스크롤하면 바로 기능을 쓸 수
+  있게 하자"고 하셨는데, 이건 `CLAUDE.md`의 MVP 요구사항(기본 인증과 프로젝트 소유권)과 Phase 2에서
+  이미 검증한 "다른 사용자는 접근할 수 없다"는 보장을 직접 무효화하는 큰 변경이라 조용히 진행하지 않고
+  먼저 여쭤봤습니다. 사용자가 확인해주신 방향은 "기존 계정 체계는 그대로 두고, 로그인 없이 바로 써볼
+  수 있는 별도의 데모를 추가"하는 것이었습니다. 이 데모(`/api/demo/compile`)는 아직 요청 속도 제한
+  (rate limiting) 인프라가 없는 상태에서 익명 사용자가 실제 과금되는 Gemini를 호출할 수 있게 되는 걸
+  막기 위해, 아예 `compilerDeps.ts`의 공용 Gemini/Mock 선택 로직을 쓰지 않고 Mock 컴파일러만 직접
+  생성해서 씁니다 — "주석으로 조심하자"가 아니라 "애초에 코드 구조상 Gemini에 닿을 수 없게" 만든
+  것입니다. 인증 체크나 DB 저장도 전혀 하지 않습니다.
+- **실제로 발견한 버그**: 처음 버전은 사용자의 아이디어를 `northStar.audienceExperience`에만 넣었는데,
+  Mock 컴파일러의 `fields.lyrics`는 `lyricsDesign.originalLyrics`에서만 값을 가져오는 걸 뒤늦게
+  확인했습니다 — 그래서 데모 결과의 "Lyrics" 필드가 항상 비어 있었습니다. `originalLyrics`에도 같은
+  아이디어를 넣어서 수정했습니다.
+- **검증**: 스크린샷(데스크톱 히어로, 스크롤 후 데모 결과, 모바일 375px)으로 눈으로 확인했고, 새
+  Playwright 테스트로 "세션 쿠키가 전혀 없는 상태에서" 데모가 실제로 동작하는 것, 그리고
+  `prefers-reduced-motion`이 스크롤 힌트뿐 아니라 히어로 배경 애니메이션까지 멈추는 것을 확인했습니다.
+
+### What shipped
+
+- `src/app/HeroBackground.tsx` (new) — cross-fades between two self-hosted, verified-public-domain
+  Beethoven portraits every ~8s with a CSS Ken Burns zoom/pan; JS interval is skipped entirely
+  under `prefers-reduced-motion: reduce` (not just sped up), and the CSS animation/transition
+  durations are additionally covered by the existing global reduced-motion rule.
+- `public/images/hero/beethoven-{stieler-1820,mahler-1805}.jpg` (new, self-hosted).
+- `src/app/api/demo/compile/route.ts` (new) — anonymous `POST`, Zod-validated `{ idea }` (max 2000
+  chars), Mock-only by construction (see ADR-036), no auth import, no persistence.
+- `src/app/DemoForm.tsx` (new) — replaces the static mocked JSON preview card in the scroll-reveal
+  section with a real textarea → Generate → result flow, plus a "Sign up to unlock real Gemini +
+  Safe/Balanced/Bold" upsell line.
+- `src/app/page.tsx`/`page.module.css` updated to wire both in; existing account system
+  (`/login`, `/signup`, ownership checks) completely untouched.
+- 3 new unit tests (123 total, up from 120) for the demo route (validation, success shape, and
+  asserting `auth()`/`prisma.promptPackage.createMany` are never called).
+- `tests/e2e/landing.spec.ts` extended: a no-login demo-generation case, and the
+  `prefers-reduced-motion` case now also checks the hero background's animation duration (added
+  `data-testid`s to disambiguate from the pre-existing scroll-hint check, which broke once a
+  second `aria-hidden` element existed on the page).
+
+### Live verification
+
+Against the already-running dev server:
+
+- Screenshots at desktop width (hero with visible portrait + readable text, and the scroll-reveal
+  section after generating a demo result) and 375px mobile width — all reviewed, no overlap or
+  overflow issues found this time.
+- Confirmed via Playwright that the demo works with zero cookies matching `/session/i` present,
+  and that the flow never redirects to `/login`.
+- Confirmed `prefers-reduced-motion: reduce` collapses both the scroll-hint's and the active hero
+  image layer's animation duration to effectively zero.
+
+### Verification at time of this entry
+
+- `pnpm typecheck`, `pnpm lint`, `pnpm build` — pass
+- `pnpm test` — 123/123 pass (up from 120)
+- `pnpm exec playwright test tests/e2e/landing.spec.ts` — 3/3 pass
+- Live walkthrough — pass (see above)
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-036 (Mock-only demo boundary, image sourcing, the lyrics-field bug fix).
+
+### Known gaps carried forward
+
+- Real rate limiting is still needed before any anonymous path could ever be allowed to call real
+  Gemini — the demo stays Mock-only until then, by design, not as a temporary shortcut.
+- The rest of Phase 7 (methodology story, provider selector, Lab preview, app section, Lighthouse
+  baseline) is still open.
+- Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first slice is still pending.

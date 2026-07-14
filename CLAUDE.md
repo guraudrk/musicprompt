@@ -137,3 +137,19 @@ A task is not complete until:
 - No secret is present in source control.
 - The implementation matches the source-of-truth documents.
 - The user can understand what changed.
+
+
+## Self-directed workflow
+
+For multi-step work, read:
+`docs/docs/CLAUDE_SELF_DIRECTED_OPERATING_MANUAL.md`
+
+Follow its:
+- session-start protocol
+- understand/inspect/plan/execute/verify/review/record loop
+- task-priority rules
+- approval gates
+- stop conditions
+
+Do not load the full manual for trivial one-file edits.
+Do not treat it as permission for destructive, production, or paid actions.
