@@ -32,3 +32,13 @@ export function getGeminiEnvConfig(): GeminiEnvConfig {
 
   return { apiKey, model, apiMode };
 }
+
+/** Non-throwing check used to choose Gemini vs. Mock at startup (src/lib/compilerDeps.ts). */
+export function isGeminiConfigured(): boolean {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const model = process.env.GEMINI_MODEL;
+  const apiMode = process.env.GEMINI_API_MODE;
+  return Boolean(
+    apiKey && !apiKey.startsWith(PLACEHOLDER_PREFIX) && model && !model.startsWith(PLACEHOLDER_PREFIX) && apiMode,
+  );
+}

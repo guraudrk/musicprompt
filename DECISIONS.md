@@ -468,16 +468,95 @@ follow-up for a machine that has Docker/Postgres (see `docs/PHASE_LOG.md`).
 
 ---
 
+## ADR-028 — Gemini SDK verification result
+
+- Status: Accepted
+- Date: 2026-07-14
+
+### Decision
+
+Verified via WebSearch/WebFetch against ai.google.dev, npmjs.com, and github.com/googleapis/js-genai,
+and cross-checked directly against the installed `@google/genai@2.11.0` package's own `.d.ts` files
+(not assumed from memory, per ADR-007/IMPLEMENTATION_PLAN.md §3.1):
+
+- Official package: `@google/genai` (unified SDK; the older `@google/generative-ai` is deprecated).
+- Structured output goes through the **Interactions API**: `client.interactions.create({ model,
+  input, system_instruction, response_format })`. This confirms `GEMINI_API_MODE=interactions` was
+  a real, correct value all along, not a nonsense placeholder.
+- Parameters are snake_case even in the TS/JS SDK for this API (`system_instruction`,
+  `response_format`, `generation_config`, `previous_interaction_id`) — confirmed both in official
+  docs and in the package's own type definitions.
+- `response_format: { type: "text", mime_type: "application/json", schema: <JSON Schema> }`; result
+  arrives as `interaction.output_text` (a JSON string).
+- Zod 4 (already a dependency) has built-in `z.toJSONSchema(schema)` — no separate conversion
+  library needed.
+- The SDK's own `GoogleGenAIRequestOptions` (second argument to `.create()`) has `timeout` and
+  `maxRetries` — we use those rather than reimplementing timeout/retry ourselves. `ApiError` (with
+  a `.status` HTTP code) is the SDK's exported error class, used to map 429/401/403/5xx to clearer
+  messages.
+- Model naming (2026-07-14): `gemini-3.5-flash` is what today's official docs pair with the
+  Interactions API in every example, and is a real model identifier in the SDK's own `Model_2`
+  type union; `gemini-2.5-flash` is the older GA-stable (until Oct 2026) alternative. `GEMINI_MODEL`
+  stays fully configurable (ADR-018) regardless.
+
+### Consequence
+
+Resolves the `GEMINI_API_MODE`/model pending-decision item below.
+
+---
+
+## ADR-029 — Gemini is the default compiler/evaluator when configured; dev-only Mock fallback
+
+- Status: Accepted
+- Date: 2026-07-14
+
+### Decision
+
+`src/lib/compilerDeps.ts` uses `GeminiPromptCompiler`/`GeminiPromptEvaluator` when
+`GEMINI_API_KEY`/`GEMINI_MODEL`/`GEMINI_API_MODE` are all configured (not placeholders), wrapped so
+that in development a failure falls back to the deterministic Mock (`src/llm/devFallback.ts`); in
+production the real error is rethrown. Without a configured key (e.g. CI), Mock is used directly,
+unchanged from Phase 1 (ADR-011).
+
+### Consequence (live-verified correctness fix)
+
+The dev-fallback wrapper's `metadata` field is mutated per-call to reflect whichever backend
+*actually* served that call, not just always the real compiler's. Live testing against a real
+Gemini key caught an earlier version of this that always reported Gemini's metadata even on calls
+that silently fell back to Mock — which would have permanently mislabeled Mock-produced content as
+Gemini output in persisted `PromptPackage` rows. Fixed before merge; see `docs/TROUBLESHOOTING.md`.
+
+---
+
+## ADR-030 — `spec-enrichment.system.md` deferred
+
+- Status: Accepted
+- Date: 2026-07-14
+
+### Decision
+
+Of the four system-instruction templates named in IMPLEMENTATION_PLAN.md §3.5, only
+`provider-compiler.system.md`, `prompt-evaluator.system.md`, and `prompt-repair.system.md` exist.
+`spec-enrichment.system.md` is deferred.
+
+### Reason
+
+PRODUCT_SPEC.md's Stage B (theory enrichment) is deterministic-rules based in the current
+pipeline, not a Gemini call — the real theory engines are Phase 4. A template file with no caller
+would be dead code. Create it when Stage B actually calls Gemini.
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:
 
 - Database hosting (production/staging)
 - Deployment platform
-- `GEMINI_API_MODE` value and current Gemini model — `.env.example` currently has
-  `GEMINI_API_MODE=interactions`, which is a placeholder not defined by any source document or
-  verified against current official Google GenAI SDK docs. Must be verified before Phase 3 real
-  Gemini wiring, per ADR-007.
+- Budget-limit policy for Gemini usage (per-user cap? global cap? none for now?) — needed before
+  IMPLEMENTATION_PLAN.md §3.7's "budget limit" resilience item can be implemented; this is a
+  product policy decision, not an engineering one.
 - Logging and observability provider
-- Rate-limit implementation
+- Rate-limit implementation (an app-level system, distinct from the single-Gemini-429 handling
+  ADR-029 already covers)
 - Background-job requirement

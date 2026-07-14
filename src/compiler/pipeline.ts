@@ -1,8 +1,8 @@
 import type { SongDesignSpec } from "@/domain/songDesignSpec/schema";
 import type { ProviderCapabilityProfile } from "@/domain/providerCapability/schema";
 import type { ProviderRegistry } from "@/providers/registry";
-import type { PromptCompiler, PromptEvaluator, ProviderCompilerInput } from "./types";
-import { MusicAIPromptPackageSchema, type MusicAIPromptPackage, type Strategy } from "@/domain/promptPackage/schema";
+import type { PromptCompiler, PromptEvaluator, ProviderCompilerInput, CompilerMetadata } from "./types";
+import { MusicAIPromptPackageSchema, SCHEMA_VERSION, type MusicAIPromptPackage, type Strategy } from "@/domain/promptPackage/schema";
 
 export type CompilePipelineDeps = {
   registry: ProviderRegistry;
@@ -13,6 +13,7 @@ export type CompilePipelineDeps = {
 export type CompilePipelineResult = {
   package: MusicAIPromptPackage;
   repaired: boolean;
+  metadata: CompilerMetadata & { schemaVersion: string; latencyMs: number; repairCount: number };
 };
 
 function validatePackage(
@@ -47,6 +48,8 @@ function validatePackage(
   return { ok: errors.length === 0, errors };
 }
 
+const FALLBACK_METADATA: CompilerMetadata = { model: "unknown", apiMode: "unknown", promptTemplateVersion: "unknown" };
+
 /**
  * Orchestrates PRODUCT_SPEC.md §9.2 Stage C through H for one provider + strategy. Stage A
  * (normalization) is assumed to have already produced `spec`. Stage B (theory enrichment) is a
@@ -71,6 +74,8 @@ export async function compilePromptPackage(
     strategy,
     theorySummary: spec.compositionTheory,
   };
+
+  const startedAt = Date.now();
 
   // Stage D: Gemini (or Mock) structured compiler.
   let pkg = await deps.compiler.compile(compilerInput);
@@ -99,9 +104,19 @@ export async function compilePromptPackage(
   // Stage F: independent evaluator (separate schema/instruction from the compiler — ADR-009).
   const quality = await deps.evaluator.evaluate({ spec, package: pkg });
   const finalPackage: MusicAIPromptPackage = { ...pkg, promptQuality: quality };
+  const latencyMs = Date.now() - startedAt;
 
   // Stage H: final package assembly.
-  return { package: MusicAIPromptPackageSchema.parse(finalPackage), repaired };
+  return {
+    package: MusicAIPromptPackageSchema.parse(finalPackage),
+    repaired,
+    metadata: {
+      ...(deps.compiler.metadata ?? FALLBACK_METADATA),
+      schemaVersion: SCHEMA_VERSION,
+      latencyMs,
+      repairCount: repaired ? 1 : 0,
+    },
+  };
 }
 
 /** Compiles Safe, Balanced, and Bold in parallel for one provider (PRODUCT_SPEC.md §11). */

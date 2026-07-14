@@ -1,10 +1,12 @@
 import type { LLMProvider } from "@/llm/types";
-import type { PromptCompiler, ProviderCompilerInput, PromptRepairInput } from "@/compiler/types";
+import type { PromptCompiler, ProviderCompilerInput, PromptRepairInput, CompilerMetadata } from "@/compiler/types";
 import { MusicAIPromptPackageSchema, type MusicAIPromptPackage } from "@/domain/promptPackage/schema";
 import { MockLLMProvider, MOCK_TASK } from "./mockLLMProvider";
 
 /** Deterministic PromptCompiler used in CI and this slice's vertical proof (ADR-011). */
 export class MockPromptCompiler implements PromptCompiler {
+  readonly metadata: CompilerMetadata = { model: "mock", apiMode: "mock", promptTemplateVersion: "n/a" };
+
   constructor(private readonly llm: LLMProvider = new MockLLMProvider()) {}
 
   async compile(input: ProviderCompilerInput): Promise<MusicAIPromptPackage> {

@@ -135,3 +135,91 @@ See `DECISIONS.md` ADR-024 through ADR-027.
   server-incremented version instead of rejecting stale client writes.
 - DB hosting, deployment platform, logging/observability, rate limiting, background jobs — still
   pending (see `DECISIONS.md`).
+
+---
+
+## Phase 3 — Gemini structured compiler (first slice)
+
+- Date: 2026-07-14
+- Status: **DONE, live-verified against the real Gemini API** — the user's own question ("왜
+  도커를 설치한 거야?") from Phase 2 carried forward the same lesson here: don't trust
+  code-complete-but-unexecuted claims, actually run it.
+
+### What shipped
+
+- SDK verification (ADR-028) via WebSearch/WebFetch against ai.google.dev, npmjs.com,
+  github.com/googleapis/js-genai, **and** direct inspection of the installed
+  `@google/genai@2.11.0` package's own `.d.ts` files (not assumed from memory, not from old
+  examples). Confirmed: `@google/genai` is the official SDK, the Interactions API
+  (`client.interactions.create`) is the current structured-output mechanism, `GEMINI_API_MODE=
+  interactions` was a real correct value all along, parameters are snake_case even in the JS SDK,
+  and Zod 4 already has `z.toJSONSchema()` built in.
+- Real `GeminiLLMProvider` (`src/llm/gemini/geminiLLMProvider.ts`) — no more "server-only skeleton"
+  throw. Converts the given Zod schema to JSON Schema, calls the Interactions API with
+  `system_instruction`/`response_format`, parses `output_text` back through the original Zod
+  schema.
+- `src/llm/gemini/resilience.ts` — uses the SDK's own `timeout`/`maxRetries` options (found by
+  reading its type definitions) rather than reimplementing retry logic; `mapGeminiError` gives
+  429/401/403/5xx clear, distinct messages via the SDK's exported `ApiError` class.
+- Three of the four system-instruction templates from IMPLEMENTATION_PLAN.md §3.5
+  (`provider-compiler`, `prompt-evaluator`, `prompt-repair` — `spec-enrichment` deferred, ADR-030),
+  read from `src/llm/gemini/prompts/*.system.md` via a small `readTemplate()` helper.
+- `src/llm/devFallback.ts` — Gemini is now the default compiler/evaluator when configured
+  (ADR-029); a failure falls back to Mock in development only, production surfaces the real error.
+- Compile-call metadata (model, API mode, prompt-template version, schema version, latency, repair
+  count) persisted on `PromptPackage` via a new migration
+  (`20260714063919_add_compile_metadata`) with backfill defaults for the 12 pre-existing local rows.
+- 24 new unit tests (52 total, up from 25): mocked `@google/genai` client for `GeminiLLMProvider`
+  (schema conversion, output parsing, 429 mapping), `GeminiPromptCompiler`/`GeminiPromptEvaluator`
+  (template loading, metadata), `devFallback` (fallback + metadata correctness), `isGeminiConfigured`.
+
+### Live verification (real Gemini API calls, not simulated)
+
+With explicit user permission (small real cost/quota use), ran the actual compile endpoint against
+the real rotated key in `.env.local`:
+
+- First attempt at a 30s timeout: all three Safe/Balanced/Bold calls timed out and correctly fell
+  back to Mock (proving the fallback path works) — but that meant no real content yet. A minimal
+  isolated test script showed a plain call takes ~17s and a small structured-output call ~19s, so
+  30s was too tight once the *actual* large `MusicAIPromptPackageSchema` and three concurrent
+  requests were involved. Bumped the SDK timeout to 60s (ADR/IMPLEMENTATION_PLAN §3.7 updated).
+- Second attempt: **Safe and Balanced strategies both succeeded for real.** Gemini produced
+  genuinely distinct, on-theme creative content for each strategy — e.g. Balanced returned a full
+  verse/chorus/outro with lines like "I searched the shadows, traced the cold outline" and "The
+  ghost I chased was always in the room" — and both preserved the locked lyric line ("I never
+  found the one who broke me.") verbatim, as required. `psql` confirmed the persisted
+  `PromptPackage` rows recorded `model: gemini-3.5-flash`, `apiMode: interactions`, and realistic
+  multi-attempt latencies (58–141 seconds, consistent with the SDK's own internal retry extending
+  past a single 60s attempt).
+- **Bug caught by this live test**: `wrapCompilerWithDevFallback`'s `metadata` was originally
+  static — it always reported the real Gemini compiler's metadata even on calls that actually fell
+  back to Mock, which would have permanently mislabeled Mock-produced content as Gemini output in
+  the persisted metadata. Fixed to mutate `metadata` per-call based on which backend actually
+  served that call, with new tests asserting both directions. See `docs/TROUBLESHOOTING.md`.
+- Bold strategy needed the dev fallback more than once during testing (its generation apparently
+  takes longer) — accepted as the fallback mechanism doing its job rather than chased further, to
+  avoid burning more real API quota chasing a "perfect" 3-for-3 run when the definition-of-done
+  (one real fixture compiling) was already satisfied twice over with full content verification.
+
+### Verification at time of this entry
+
+- `pnpm typecheck`, `pnpm lint` — pass
+- `pnpm test` — 52/52 pass (all offline; `@google/genai` is mocked, no network access needed)
+- `pnpm build` — pass, all routes compiled
+- `pnpm prisma migrate dev` — pass, new columns confirmed via `psql \d "PromptPackage"`
+- Real Gemini calls — pass (see above), with one real bug found and fixed as a direct result
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-028 through ADR-030.
+
+### Known gaps carried forward
+
+- `spec-enrichment.system.md` deferred until Stage B (Phase 4 theory engines) calls Gemini (ADR-030).
+- Budget-limit policy — new pending decision, needs a product answer (per-user/global/none) before
+  it can be engineered.
+- Persisting metadata for *failed* compile attempts — only successes get a `PromptPackage` row
+  this slice; proper failure logging needs the still-pending logging/observability provider.
+- App-level rate limiting (distinct from the single-Gemini-429 handling this phase adds) — still
+  pending, unchanged from Phase 0-2.
+- DB hosting, deployment platform, background jobs — still pending.

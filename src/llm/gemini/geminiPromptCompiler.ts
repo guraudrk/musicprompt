@@ -1,19 +1,22 @@
 import "server-only";
 import type { LLMProvider } from "@/llm/types";
-import type { PromptCompiler, ProviderCompilerInput, PromptRepairInput } from "@/compiler/types";
+import type { PromptCompiler, ProviderCompilerInput, PromptRepairInput, CompilerMetadata } from "@/compiler/types";
 import { MusicAIPromptPackageSchema, type MusicAIPromptPackage } from "@/domain/promptPackage/schema";
+import { getGeminiEnvConfig } from "@/lib/env";
 import { GeminiLLMProvider } from "./geminiLLMProvider";
+import { readSystemInstructionTemplate } from "./readTemplate";
 
-// Placeholder instructions. Phase 3 replaces these with versioned files
-// (provider-compiler.system.md, prompt-repair.system.md) per IMPLEMENTATION_PLAN.md §3.5 —
-// ADR-009 requires the compiler and evaluator to use separate system instructions.
-const PROVIDER_COMPILER_SYSTEM_INSTRUCTION =
-  "Convert the structured song design into a fluent, provider-specific prompt package. Do not override user-confirmed fields, invent capabilities, or rewrite locked lyrics.";
-const PROMPT_REPAIR_SYSTEM_INSTRUCTION =
-  "Fix only the reported validation errors in the previous output. Do not perform unrelated rewriting.";
+const PROVIDER_COMPILER_SYSTEM_INSTRUCTION = readSystemInstructionTemplate("provider-compiler.system.md");
+const PROMPT_REPAIR_SYSTEM_INSTRUCTION = readSystemInstructionTemplate("prompt-repair.system.md");
+const PROMPT_TEMPLATE_VERSION = "1";
 
 export class GeminiPromptCompiler implements PromptCompiler {
-  constructor(private readonly llm: LLMProvider = new GeminiLLMProvider()) {}
+  readonly metadata: CompilerMetadata;
+
+  constructor(private readonly llm: LLMProvider = new GeminiLLMProvider()) {
+    const config = getGeminiEnvConfig();
+    this.metadata = { model: config.model, apiMode: config.apiMode, promptTemplateVersion: PROMPT_TEMPLATE_VERSION };
+  }
 
   async compile(input: ProviderCompilerInput): Promise<MusicAIPromptPackage> {
     return this.llm.generateStructured({

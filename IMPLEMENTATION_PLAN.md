@@ -180,19 +180,18 @@ Scope for this slice is trimmed to one dense project page rather than the full 8
 
 ## Phase 3 — Gemini structured compiler
 
-Status: `TODO`
+Status: `DONE` (first-slice scope, live-verified with real Gemini calls)
 
 ### 3.1 Official SDK verification
 
-Before implementation:
+- [x] Verify the current official Google GenAI JavaScript SDK. — `@google/genai` (unified SDK).
+- [x] Verify the current stable or recommended API. — Interactions API (`client.interactions.create`).
+- [x] Verify structured output syntax. — `response_format: { type, mime_type, schema }` + `z.toJSONSchema`.
+- [x] Verify supported model identifiers. — checked against the installed package's own `Model_2` type union.
+- [x] Record the result in `DECISIONS.md`. — ADR-028.
 
-- Verify the current official Google GenAI JavaScript SDK.
-- Verify the current stable or recommended API.
-- Verify structured output syntax.
-- Verify supported model identifiers.
-- Record the result in `DECISIONS.md`.
-
-Do not rely on old examples.
+Verified against ai.google.dev, npmjs.com, github.com/googleapis/js-genai, and the installed
+package's own `.d.ts` files directly — not old examples.
 
 ### 3.2 Environment
 
@@ -202,76 +201,92 @@ GEMINI_MODEL
 GEMINI_API_MODE
 ```
 
-`GEMINI_MODEL` must be configurable.
+- [x] `GEMINI_MODEL` is configurable (unchanged from ADR-018; `.env.example` now documents
+  `gemini-3.5-flash` as the current recommended default per ADR-028).
 
 ### 3.3 Adapter
 
-Implement:
+- [x] `class GeminiLLMProvider implements LLMProvider` (`src/llm/gemini/geminiLLMProvider.ts`) —
+  real `@google/genai` Interactions API call.
+- [x] `class GeminiPromptCompiler implements PromptCompiler` (`src/llm/gemini/geminiPromptCompiler.ts`)
+- [x] `class GeminiPromptEvaluator implements PromptEvaluator` (`src/llm/gemini/geminiPromptEvaluator.ts`)
 
-```ts
-class GeminiLLMProvider implements LLMProvider
-class GeminiPromptCompiler implements PromptCompiler
-class GeminiPromptEvaluator implements PromptEvaluator
-```
-
-Keep transport details out of domain services.
+Transport details (the SDK, JSON Schema conversion, retry/timeout options) stay inside
+`src/llm/gemini/`; domain/compiler code only depends on the `LLMProvider`/`PromptCompiler`/
+`PromptEvaluator` interfaces.
 
 ### 3.4 Compiler pipeline
 
-1. Validate SongDesignSpec.
-2. Apply deterministic theory summaries.
-3. Project to provider compiler input.
-4. Call Gemini structured output.
-5. Parse with Zod.
-6. Run deterministic validation.
-7. Call separate evaluator.
-8. Repair once only if blocking.
-9. Persist package and metadata.
+`src/compiler/pipeline.ts` (unchanged structure from Phase 1, now backed by real Gemini when
+configured):
+
+1. [x] Validate SongDesignSpec. — caller-side, via `SongDesignSpecSchema`.
+2. [x] Apply deterministic theory summaries. — still a Stage B pass-through stub (Phase 4 territory).
+3. [x] Project to provider compiler input.
+4. [x] Call Gemini structured output.
+5. [x] Parse with Zod. — inside `GeminiLLMProvider.generateStructured`.
+6. [x] Run deterministic validation. — Stage E, unchanged.
+7. [x] Call separate evaluator. — Stage F, unchanged (ADR-009).
+8. [x] Repair once only if blocking. — Stage G, unchanged (ADR-010).
+9. [x] Persist package and metadata. — new `PromptPackage` columns (§3.6).
 
 ### 3.5 Prompt roles
 
-Create separate prompt templates:
+- [x] `provider-compiler.system.md`
+- [x] `prompt-evaluator.system.md`
+- [x] `prompt-repair.system.md`
+- [ ] `spec-enrichment.system.md` — deferred (ADR-030): Stage B doesn't call Gemini yet (Phase 4).
 
-- `spec-enrichment.system.md`
-- `provider-compiler.system.md`
-- `prompt-evaluator.system.md`
-- `prompt-repair.system.md`
-
-Do not use one giant system prompt.
+Not one giant system prompt — each is its own file under `src/llm/gemini/prompts/`, read via
+`readSystemInstructionTemplate()`.
 
 ### 3.6 Required metadata
 
-Persist:
+Persisted on `PromptPackage` (new columns, migration `20260714063919_add_compile_metadata`):
 
-- Provider profile version
-- Gemini model
-- API mode
-- Prompt-template version
-- Schema version
-- Latency
-- Success/failure
-- Repair count
+- [x] Provider profile version — already existed (`providerProfileVersion`).
+- [x] Gemini model
+- [x] API mode
+- [x] Prompt-template version
+- [x] Schema version
+- [x] Latency
+- [ ] Success/failure — only successful compiles get a row this slice (documented simplification;
+  logging failed attempts needs the still-pending logging/observability provider decision).
+- [x] Repair count
 
-Do not persist the Gemini key.
+- [x] Gemini key is never persisted — confirmed by reading the migration and the API routes; only
+  `model`/`apiMode`/etc. (never `GEMINI_API_KEY`) are written.
 
 ### 3.7 Resilience
 
-- Timeout
-- Retry only for transient failures
-- No retry storm
-- Rate-limit response
-- Budget limit
-- User-friendly error
-- Mock fallback in development only
+- [x] Timeout — `GEMINI_REQUEST_OPTIONS.timeout` (60s, tuned from a live-verified ~17-19s baseline
+  for simple calls once the actual large `MusicAIPromptPackageSchema` + concurrent Safe/Balanced/
+  Bold calls pushed real latency past the initial 30s guess).
+- [x] Retry only for transient failures — delegated to the SDK's own `maxRetries: 1` (its own
+  retry policy, not reimplemented) plus `mapGeminiError` distinguishing 4xx from 5xx.
+- [x] No retry storm — capped at the SDK's `maxRetries: 1`.
+- [x] Rate-limit response — 429 mapped to a distinct, clear message (`mapGeminiError`), not retried
+  into.
+- [ ] Budget limit — deferred; needs a product policy decision (new pending item in `DECISIONS.md`).
+- [x] User-friendly error — `mapGeminiError` covers 429/401/403/5xx/other.
+- [x] Mock fallback in development only — `src/llm/devFallback.ts`; production rethrows.
 
 ### Definition of done
 
-- Real Gemini call compiles one fixture.
-- Structured output validates.
-- Invalid fixtures are blocked before the API call where possible.
-- Repair count never exceeds one.
-- API key is absent from browser bundles and logs.
-- Mock tests still run in CI without the key.
+- [x] Real Gemini call compiles one fixture. — live-verified repeatedly against the real rotated
+  key: Safe and Balanced strategies returned genuinely distinct, on-topic creative lyrics/style
+  text from `gemini-3.5-flash`, with the locked lyric line preserved verbatim. See
+  `docs/PHASE_LOG.md` Phase 3 entry for the actual content and timings.
+- [x] Structured output validates. — every successful call parsed through
+  `MusicAIPromptPackageSchema`/`PromptQualityReportSchema` with no manual coercion.
+- [x] Invalid fixtures are blocked before the API call where possible. — `SongDesignSpecSchema`
+  validation happens before any Gemini call is made.
+- [x] Repair count never exceeds one. — unchanged Stage G cap (ADR-010); `repairCount` persisted
+  as 0 or 1.
+- [x] API key is absent from browser bundles and logs. — `server-only` guards throughout
+  `src/llm/gemini/`; `mapGeminiError`/console.warn messages never include the key.
+- [x] Mock tests still run in CI without the key. — all 52 unit tests mock `@google/genai` or use
+  `MockPromptCompiler`/`MockPromptEvaluator` directly; none require network access.
 
 ---
 
@@ -467,8 +482,13 @@ Each requires official capability verification and tests.
 3. ~~Complete Phase 2 first slice and live-verify it.~~ Done — 25 unit tests + a live walkthrough
    against a real Docker Postgres (signup, CRUD, autosave, compile, export, cross-user ownership
    denial) + a passing Playwright run. See `docs/PHASE_LOG.md` and `docs/TROUBLESHOOTING.md`.
-4. **Next actual work**: either the Phase 2-tail UI (reference/deliberate-differences,
-   structure/emotion-curve editing, full 8-screen wizard) or Phase 3 (Gemini). Do not start real
-   Gemini wiring until `GEMINI_API_MODE` and the current official Google GenAI SDK shape are
-   verified (ADR-007) — that verification itself should be the first step of Phase 3, not an
-   afterthought.
+4. ~~Complete Phase 3 (Gemini) and live-verify it.~~ Done — SDK verified against official sources
+   and the installed package's own types (ADR-028), real `@google/genai` Interactions API wiring,
+   52 unit tests (all offline/mocked), and repeated live calls against the real rotated key
+   producing genuinely distinct Safe/Balanced/Bold creative output with locked lyrics preserved.
+   See `docs/PHASE_LOG.md` and `docs/TROUBLESHOOTING.md` for exact timings and a real correctness
+   bug (dev-fallback metadata mislabeling) caught and fixed during live testing.
+5. **Next actual work**: the Phase 2-tail UI (reference/deliberate-differences,
+   structure/emotion-curve editing, full 8-screen wizard) or Phase 4 (theory engines). A budget-
+   limit policy decision is now pending before Gemini usage caps can be implemented
+   (see `DECISIONS.md`).

@@ -83,4 +83,22 @@ describe("Mock compile pipeline (Stage A-H)", () => {
 
     await expect(compilePromptPackage(spec, "does-not-exist", "safe", deps)).rejects.toThrow(/Unknown provider/);
   });
+
+  it("reports compile-call metadata (Phase 3, IMPLEMENTATION_PLAN.md §3.6)", async () => {
+    const spec = buildValidSpec();
+    const deps = makeDeps();
+
+    const { metadata, repaired } = await compilePromptPackage(spec, "generic", "safe", deps);
+
+    expect(metadata).toEqual({
+      model: "mock",
+      apiMode: "mock",
+      promptTemplateVersion: "n/a",
+      schemaVersion: "1",
+      latencyMs: expect.any(Number),
+      repairCount: 0,
+    });
+    expect(repaired).toBe(false);
+    expect(metadata.latencyMs).toBeGreaterThanOrEqual(0);
+  });
 });

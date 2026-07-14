@@ -28,7 +28,7 @@ export async function POST(request: Request, { params }: Params) {
     );
 
     await prisma.promptPackage.createMany({
-      data: [safe, balanced, bold].map(({ package: pkg }) => ({
+      data: [safe, balanced, bold].map(({ package: pkg, metadata }) => ({
         projectId,
         providerId: pkg.providerId,
         providerProfileVersion: pkg.providerProfileVersion,
@@ -36,6 +36,12 @@ export async function POST(request: Request, { params }: Params) {
         fields: pkg.fields,
         warnings: pkg.warnings,
         promptQuality: pkg.promptQuality,
+        model: metadata.model,
+        apiMode: metadata.apiMode,
+        promptTemplateVersion: metadata.promptTemplateVersion,
+        schemaVersion: metadata.schemaVersion,
+        latencyMs: metadata.latencyMs,
+        repairCount: metadata.repairCount,
       })),
     });
 

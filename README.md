@@ -17,13 +17,14 @@
 
 ## 현재 상태
 
-**Phase 0–2 (1차 슬라이스) 완료, 실제 로컬 Postgres(Docker)로 라이브 검증까지 마침.** `SongDesignSpec` Zod
-스키마, Generic/Suno/Udio Provider Registry, Mock LLM Provider/Compiler/Evaluator, Gemini Provider
-인터페이스(서버 전용 골격, 실제 네트워크 호출 없음), Safe/Balanced/Bold Mock 컴파일 파이프라인, Auth.js
-이메일/비밀번호 인증, Prisma/Postgres 영속성, 프로젝트 CRUD·컴파일·내보내기 API, 단일 페이지 프로젝트
-편집기가 구현되어 있습니다. 회원가입→프로젝트 생성→저장→컴파일→내보내기, 다른 사용자 접근 차단, Playwright
-happy-path까지 실제로 실행해 확인했습니다 (`docs/PHASE_LOG.md` Phase 2 "Live verification" 참고). 전체
-8단계 위저드 UI·실제 Gemini 연동·PWA/모바일은 아직 없습니다 (Phase 2 후반·Phase 3+ 예정).
+**Phase 0–3 완료, 실제 Postgres와 실제 Gemini 호출로 라이브 검증까지 마침.** `SongDesignSpec` Zod 스키마,
+Generic/Suno/Udio Provider Registry, Auth.js 이메일/비밀번호 인증, Prisma/Postgres 영속성, 프로젝트
+CRUD·컴파일·내보내기 API, 단일 페이지 프로젝트 편집기, 그리고 `@google/genai`(Interactions API)를 통한
+실제 Gemini 구조화 출력 컴파일러가 구현되어 있습니다 (개발 환경에서는 실패 시 Mock으로 자동 폴백, 프로덕션은
+실제 에러를 그대로 노출). 회원가입→프로젝트 생성→저장→컴파일→내보내기, 다른 사용자 접근 차단, Playwright
+happy-path, 그리고 실제 Gemini API 호출로 Safe/Balanced/Bold를 컴파일하고 잠금 가사가 그대로 보존되는 것까지
+전부 실제로 실행해 확인했습니다 (`docs/PHASE_LOG.md` Phase 2/3 "Live verification" 참고). 전체 8단계 위저드
+UI·PWA/모바일은 아직 없습니다 (Phase 2 후반·Phase 4+ 예정).
 
 상세는 [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md), [`docs/PHASE_LOG.md`](docs/PHASE_LOG.md),
 [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) 참고.
@@ -44,13 +45,17 @@ pnpm test        # Vitest 단위 테스트
 ## 로컬에서 DB 붙여서 확인하기
 
 ```bash
-docker compose up -d                        # 로컬 Postgres 실행
-pnpm prisma migrate dev --name init          # 마이그레이션 적용
-pnpm dev                                     # 개발 서버 (회원가입 -> 프로젝트 생성 -> 컴파일 -> 내보내기)
+docker compose up -d           # 로컬 Postgres 실행
+pnpm prisma migrate dev        # 마이그레이션 적용 (이미 있는 마이그레이션 파일들을 순서대로 적용)
+pnpm dev                       # 개발 서버 (회원가입 -> 프로젝트 생성 -> 컴파일 -> 내보내기)
 
 pnpm exec playwright install
-pnpm test:e2e                                # Playwright happy-path 테스트
+pnpm test:e2e                  # Playwright happy-path 테스트
 ```
+
+`.env.local`에 `GEMINI_API_KEY`/`GEMINI_MODEL`/`GEMINI_API_MODE`가 모두 실제 값으로 채워져 있으면
+컴파일 버튼이 실제 Gemini를 호출합니다 (개발 환경에서는 실패 시 Mock으로 자동 폴백). 비워두면 지금까지와
+동일하게 Mock만 사용합니다.
 
 ## 보안
 

@@ -1,17 +1,21 @@
 import "server-only";
 import type { LLMProvider } from "@/llm/types";
-import type { PromptEvaluator, PromptEvaluationInput } from "@/compiler/types";
+import type { PromptEvaluator, PromptEvaluationInput, CompilerMetadata } from "@/compiler/types";
 import { PromptQualityReportSchema, type PromptQualityReport } from "@/domain/evaluation/schema";
+import { getGeminiEnvConfig } from "@/lib/env";
 import { GeminiLLMProvider } from "./geminiLLMProvider";
+import { readSystemInstructionTemplate } from "./readTemplate";
 
-// Placeholder instruction. Phase 3 replaces this with a versioned file
-// (prompt-evaluator.system.md) per IMPLEMENTATION_PLAN.md §3.5 — ADR-009 requires the evaluator
-// to use a system instruction and schema separate from the compiler's.
-const PROMPT_EVALUATOR_SYSTEM_INSTRUCTION =
-  "Independently score the compiled prompt package against the source song design. This is a design-fit score, not an artistic absolute.";
+const PROMPT_EVALUATOR_SYSTEM_INSTRUCTION = readSystemInstructionTemplate("prompt-evaluator.system.md");
+const PROMPT_TEMPLATE_VERSION = "1";
 
 export class GeminiPromptEvaluator implements PromptEvaluator {
-  constructor(private readonly llm: LLMProvider = new GeminiLLMProvider()) {}
+  readonly metadata: CompilerMetadata;
+
+  constructor(private readonly llm: LLMProvider = new GeminiLLMProvider()) {
+    const config = getGeminiEnvConfig();
+    this.metadata = { model: config.model, apiMode: config.apiMode, promptTemplateVersion: PROMPT_TEMPLATE_VERSION };
+  }
 
   async evaluate(input: PromptEvaluationInput): Promise<PromptQualityReport> {
     return this.llm.generateStructured({

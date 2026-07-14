@@ -21,7 +21,7 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   try {
-    const { package: pkg } = await compilePromptPackage(
+    const { package: pkg, metadata } = await compilePromptPackage(
       result.project.spec,
       providerId,
       parsedBody.data.strategy,
@@ -37,6 +37,12 @@ export async function POST(request: Request, { params }: Params) {
         fields: pkg.fields,
         warnings: pkg.warnings,
         promptQuality: pkg.promptQuality,
+        model: metadata.model,
+        apiMode: metadata.apiMode,
+        promptTemplateVersion: metadata.promptTemplateVersion,
+        schemaVersion: metadata.schemaVersion,
+        latencyMs: metadata.latencyMs,
+        repairCount: metadata.repairCount,
       },
     });
 

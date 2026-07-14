@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { PromptQualityReportSchema } from "@/domain/evaluation/schema";
 
+/** Bump when MusicAIPromptPackageSchema changes materially; persisted alongside compiled packages (IMPLEMENTATION_PLAN.md §3.6). */
+export const SCHEMA_VERSION = "1";
+
 export const StrategySchema = z.enum(["safe", "balanced", "bold"]);
 export type Strategy = z.infer<typeof StrategySchema>;
 

@@ -136,3 +136,84 @@ Everything above except the last item only surfaces when actually running `docke
 Prisma client, mocked session) all passed the whole time; they couldn't catch a credential
 mismatch, a CLI config error, or a browser permission default. This is the concrete reason
 `IMPLEMENTATION_PLAN.md` and `docs/PHASE_LOG.md` distinguish "code-complete" from "live-verified."
+
+---
+
+## Phase 3 (Gemini structured compiler)
+
+### `prisma migrate dev` fails to add required columns to a non-empty table
+
+**Symptom:** Adding `model`/`apiMode`/etc. as required (`NOT NULL`, no default) columns to
+`PromptPackage` failed: `Added the required column ... without a default value. There are 12 rows
+in this table, it is not possible to execute this step.` (leftover local test data from the Phase 2
+live walkthrough).
+
+**Fix:** `prisma migrate dev --name ... --create-only` to generate the migration file without
+applying it, then hand-edited the generated SQL to add `DEFAULT 'unknown'` / `DEFAULT 0` for the
+backfill, then applied it. The Prisma schema itself doesn't declare `@default(...)` for these
+fields — every real compile always supplies them explicitly — so this is a one-time backfill
+convenience in the SQL, not an app-relied-upon default.
+
+### An interactively-run `prisma migrate dev` left a stale Postgres advisory lock
+
+**Symptom:** After stopping a hung `pnpm prisma migrate dev` (it was silently waiting on a
+confirmation prompt that a backgrounded, non-interactive shell can never answer), every subsequent
+`prisma migrate deploy` failed with `P1002: ... Timed out trying to acquire a postgres advisory
+lock`.
+
+**Cause:** The killed process left an orphaned Postgres backend still holding
+`pg_advisory_lock(...)` (confirmed via `SELECT pid, state, query FROM pg_stat_activity`).
+
+**Fix:** `SELECT pg_terminate_backend(<pid>)` on the stale connections, then `prisma migrate
+deploy` succeeded immediately. General lesson: never run `prisma migrate dev` (interactive) in a
+backgrounded/non-interactive shell — use `--create-only` (edit, then apply) or `migrate deploy`
+(fully non-interactive) instead.
+
+### Mocking a class the SDK expects to be called with `new`
+
+**Symptom:** `vi.fn().mockImplementation(() => ({ interactions: { create: mockCreate } }))` used to
+mock `GoogleGenAI` failed with `TypeError: ... is not a constructor` as soon as production code did
+`new GoogleGenAI({ apiKey })`.
+
+**Cause:** Arrow functions can never be used as a constructor (`new` target), regardless of what
+they return.
+
+**Fix:** Used a real `function` expression as the mock implementation instead (`vi.fn()
+.mockImplementation(function (this) { this.interactions = { create: mockCreate }; })`), which
+`new` can invoke normally.
+
+### Real Gemini calls took much longer than a guessed timeout
+
+**Symptom:** The first live `compile/compare` call (Safe/Balanced/Bold in parallel) timed out at a
+guessed 30-second budget for all three strategies and silently fell back to Mock — technically
+"working as designed" (the dev-fallback engaged correctly), but it meant no real Gemini content had
+actually been produced yet.
+
+**Cause:** A minimal isolated script showed a plain call takes ~17s and a small structured-output
+call ~19s — already more than half the guessed budget — before even accounting for our actual
+`MusicAIPromptPackageSchema` (large and deeply nested) or three concurrent requests sharing rate
+limit headroom.
+
+**Fix:** Bumped `GEMINI_REQUEST_OPTIONS.timeout` from 30s to 60s based on the measured baseline,
+which let Safe and Balanced succeed for real on the next attempt (confirmed via `psql`: persisted
+`model: gemini-3.5-flash`, realistic 58–141s latencies consistent with the SDK's own internal retry
+extending past a single attempt). General lesson: don't guess a timeout for an LLM call — measure
+the actual API with a minimal isolated script first.
+
+### Dev-fallback wrapper reported the wrong backend in its metadata
+
+**Symptom:** No error or crash — a correctness bug only visible by reading the persisted
+`PromptPackage` metadata closely. `wrapCompilerWithDevFallback`'s `metadata` field was set once
+(`metadata: real.metadata`) at wrap time and never updated, so a call that actually fell back to
+Mock still reported `model: "gemini-x"` instead of `model: "mock"`.
+
+**Cause:** Static property instead of one that reflects the outcome of the most recent call.
+
+**Fix:** Made the wrapper mutate its own `metadata` field inside `compile()`/`repair()`/`evaluate()`
+based on whether the try block or the catch block actually ran, with new tests asserting both
+directions (`tests/unit/devFallback.test.ts`). Caught by deliberately inspecting real persisted
+rows during live verification, not by unit tests — the mocked-fallback unit tests that existed
+*before* this fix only asserted the fallback returns Mock's *result*, not that its *metadata*
+matched. General lesson: when a wrapper exposes metadata about "which implementation actually ran,"
+test the metadata after both the success path and the fallback path, not just the return value.
+

@@ -60,6 +60,14 @@ model PromptPackage {
   fields                 Json
   warnings               Json
   promptQuality          Json
+  // Compile-call metadata (Phase 3, IMPLEMENTATION_PLAN.md §3.6). "mock"/"mock" when compiled via
+  // MockPromptCompiler. Never the Gemini key itself.
+  model                  String
+  apiMode                String
+  promptTemplateVersion  String
+  schemaVersion          String
+  latencyMs              Int
+  repairCount            Int      @default(0)
   createdAt              DateTime @default(now())
 
   @@index([projectId])
