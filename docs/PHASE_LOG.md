@@ -4,6 +4,9 @@ Append-only record of each phase's completion, kept in sync with `IMPLEMENTATION
 changes. Each entry is added by whoever/whatever closes out that phase, alongside the README
 update, commit, and push to `origin/main` (https://github.com/guraudrk/musicprompt) for that phase.
 
+각 Phase 항목은 "### 한글 요약" 섹션(무엇을 만들었는지, 무엇을 검증했는지, 무엇이 남았는지)을 영문 상세
+내용 앞에 포함합니다. 사용자 요청(2026-07-14)에 따라 지금부터 계속 이 형식을 유지합니다.
+
 ---
 
 ## Phase 0–1 — Repository foundation, canonical domain, Mock compiler
@@ -11,6 +14,16 @@ update, commit, and push to `origin/main` (https://github.com/guraudrk/musicprom
 - Date: 2026-07-14
 - Status: first-slice scope complete (see `IMPLEMENTATION_PLAN.md` Phase 0/1 checklists for what
   is explicitly deferred to Phase 2, e.g. Postgres, CI, Playwright, auth).
+
+### 한글 요약
+
+- **무엇을 만들었나**: Next.js 앱 뼈대(TypeScript strict, pnpm, Vitest, ESLint), `SongDesignSpec`을
+  비롯한 도메인 Zod 스키마 전체, Generic/Suno/Udio Provider 등록소, 결정론적 Mock LLM
+  Provider/Compiler/Evaluator, Gemini 어댑터 골격(아직 실제 네트워크 호출 없음), Safe/Balanced/Bold를
+  만들어내는 컴파일 파이프라인(Stage A-H), 아키텍처 문서(`docs/ARCHITECTURE.md`).
+- **검증**: 유닛 테스트 18개, 타입체크·린트·빌드 전부 통과.
+- **남은 것**: 인증·DB·CI 없음(Phase 2에서 해결), `GEMINI_API_MODE` 값이 검증되지 않은 placeholder였음
+  (Phase 3에서 실제로 맞는 값이었다고 확인됨).
 
 ### What shipped
 
@@ -54,6 +67,21 @@ See `DECISIONS.md` ADR-019 through ADR-023.
 - Status: **DONE, live-verified** (see "Live verification" addendum below — the user installed
   Docker Desktop specifically so this phase could be tested against a real Postgres instead of
   staying at "code-complete, not run" indefinitely).
+
+### 한글 요약
+
+- **무엇을 만들었나**: Prisma 7 + Postgres 영속성(User/Project/ProjectVersion/PromptPackage), Auth.js
+  이메일/비밀번호 인증(JWT 세션), 소유권이 강제되는 프로젝트 CRUD·자동저장·컴파일·내보내기 API, 8단계
+  위저드 대신 축소한 단일 페이지 프로젝트 편집기, 로컬 Postgres용 `docker-compose.yml`.
+- **처음엔 실행 못 해봄**: 이 코드를 작성한 샌드박스에는 Docker/Postgres가 없어서 "코드는 완성했지만
+  실제로 돌려보진 못함" 상태로 남아 있었습니다.
+- **사용자가 Docker Desktop을 설치해서 실제로 검증**: 회원가입 → 프로젝트 생성 → 저장 → 컴파일 →
+  내보내기까지 curl로 직접 실행, 두 번째 계정으로 접근 시 403 확인, Playwright 테스트까지 실제 실행해서
+  통과시킴.
+- **실제로 돌려보다가 진짜 버그 2개 발견해서 고침**: Playwright 테스트의 로케이터 모호성 문제, 그리고
+  클립보드 복사 버튼의 권한/에러 처리 누락(실제 앱 버그).
+- **남은 것**: 8단계 위저드 UI·레퍼런스/차이점 편집, 진짜 optimistic concurrency, DB 호스팅/배포 플랫폼
+  등은 아직 미정.
 
 ### What shipped
 
@@ -144,6 +172,23 @@ See `DECISIONS.md` ADR-024 through ADR-027.
 - Status: **DONE, live-verified against the real Gemini API** — the user's own question ("왜
   도커를 설치한 거야?") from Phase 2 carried forward the same lesson here: don't trust
   code-complete-but-unexecuted claims, actually run it.
+
+### 한글 요약
+
+- **무엇을 만들었나**: 공식 `@google/genai` SDK의 Interactions API로 실제 Gemini 구조화 출력 컴파일러를
+  연결했습니다. 공식 문서뿐 아니라 **설치된 패키지의 실제 타입 정의 파일을 직접 열어서** 파라미터명
+  (snake_case), 응답 형식, 에러 클래스까지 추측 없이 확인했습니다. Gemini가 이제 기본 컴파일러/평가자이고,
+  개발 환경에서만 실패 시 Mock으로 자동 전환되며 프로덕션은 실제 에러를 그대로 보여줍니다. 컴파일 호출
+  메타데이터(모델명, 지연시간, 재시도 횟수 등)를 DB에 저장하도록 마이그레이션도 추가했습니다.
+- **실제 API 키로 라이브 검증**: Safe·Balanced 전략이 실제로 성공해서 "The ghost I chased was always
+  in the room" 같은 진짜 창작적인 가사를 만들어냈고, 잠금 가사 문장("I never found the one who broke
+  me.")도 그대로 보존됐습니다.
+- **이 라이브 테스트 중 진짜 버그 하나 발견**: Mock 폴백이 실제로 작동했는데도(즉 Mock이 응답을 만들었는데도)
+  메타데이터에는 항상 "gemini-3.5-flash가 응답했다"고 잘못 기록되는 문제를 발견했습니다. 유닛 테스트로는
+  못 잡았을 문제였고, DB에 저장된 실제 값을 눈으로 확인하다가 발견해서 바로 고쳤습니다.
+- **처음 잡았던 30초 타임아웃도 너무 짧다는 걸 실측으로 확인**해서 60초로 늘렸습니다.
+- **남은 것**: `spec-enrichment` 프롬프트 템플릿은 아직 만들 이유가 없어서 보류, Gemini 사용량 예산 제한
+  정책 미정, 실패한 호출의 메타데이터는 아직 저장하지 않음.
 
 ### What shipped
 
