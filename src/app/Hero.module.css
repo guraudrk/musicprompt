@@ -1,0 +1,218 @@
+.hero {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  min-height: 32rem;
+  overflow: hidden;
+  background: #05060a;
+  color: #ffffff;
+}
+
+.heroBackground {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.heroImageLayer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 2s ease;
+}
+
+.heroImageLayer[data-active="true"] {
+  opacity: 1;
+  animation: heroKenBurns 16s ease-in-out infinite alternate;
+}
+
+.heroImage {
+  object-fit: cover;
+  object-position: 50% 20%;
+  filter: grayscale(0.3) brightness(0.55);
+}
+
+.heroScrim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 30%, rgba(20, 21, 44, 0.55) 0%, #05060a 70%, #05060a 100%);
+}
+
+.heroCredit {
+  position: absolute;
+  left: 1rem;
+  bottom: 1rem;
+  font-size: 0.6875rem;
+  color: rgba(255, 255, 255, 0.45);
+  z-index: 1;
+}
+
+@keyframes heroKenBurns {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  100% {
+    transform: scale(1.08) translate(-1%, -1%);
+  }
+}
+
+.heroContent {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  margin: 0 auto 15rem;
+  padding: 0 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  max-width: 40rem;
+  text-align: center;
+}
+
+.headline {
+  font-size: 2.625rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.heroDescription {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.8);
+  max-width: 32rem;
+}
+
+.ctaBar {
+  /* Absolute (scoped to .hero, which is `position: relative`), not fixed to the viewport — with
+     5 sections now on the page, a page-wide fixed bar would overlap every section below Hero
+     instead of just scrolling away with it. See DECISIONS.md / TROUBLESHOOTING.md. */
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 3.75rem;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.ctaButtons {
+  display: flex;
+  gap: 0.9375rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.ctaBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 3rem;
+  padding: 0 1.875rem;
+  border-radius: 1.5rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #ffffff;
+  transition: opacity 0.2s ease;
+}
+
+.ctaBtn:hover {
+  opacity: 0.85;
+}
+
+.ctaPrimary {
+  background: linear-gradient(90deg, var(--color-accent-crimson) 0%, var(--color-accent-gold) 100%);
+}
+
+.ctaSecondary {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.scrollHint {
+  width: 1rem;
+  height: 1.5rem;
+  position: relative;
+  animation: scrollHintBounce 1.2s ease-in-out infinite;
+  transition: opacity 0.25s ease;
+}
+
+.scrollHint::before,
+.scrollHint::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-right: 2px solid rgba(255, 255, 255, 0.7);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.7);
+  transform: rotate(45deg);
+}
+
+.scrollHint::before {
+  top: 0;
+}
+
+.scrollHint::after {
+  top: 0.5rem;
+}
+
+.scrollHint[data-scrolled="true"] {
+  opacity: 0;
+}
+
+@keyframes scrollHintBounce {
+  0% {
+    transform: translateY(0);
+    opacity: 0.25;
+  }
+  45% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0.625rem);
+    opacity: 0.25;
+  }
+}
+
+@media screen and (max-width: 1261px) {
+  .headline {
+    font-size: 2.25rem;
+  }
+}
+
+@media screen and (max-width: 1024px) {
+  .heroContent {
+    margin-bottom: 13.75rem;
+  }
+}
+
+@media screen and (max-width: 640px) {
+  .headline {
+    font-size: 1.75rem;
+  }
+
+  .heroDescription {
+    font-size: 0.8125rem;
+  }
+
+  .heroContent {
+    margin-bottom: 12.5rem;
+    gap: 1.25rem;
+  }
+
+  .ctaBar {
+    bottom: 2.5rem;
+  }
+
+  .ctaBtn {
+    height: 2.75rem;
+    padding: 0 1.25rem;
+    font-size: 1rem;
+  }
+}

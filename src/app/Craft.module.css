@@ -1,0 +1,72 @@
+.section {
+  width: 100%;
+  padding: 6rem 1.5rem;
+  background: #05060a;
+  color: #ffffff;
+  display: flex;
+  justify-content: center;
+}
+
+.inner {
+  width: 100%;
+  max-width: 56rem;
+}
+
+.heading {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  max-width: 36rem;
+  margin: 0 auto 0.75rem;
+}
+
+.subheading {
+  font-size: 0.9375rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+  max-width: 32rem;
+  margin: 0 auto 3rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+.card {
+  padding: 1.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(212, 175, 106, 0.2);
+  background: linear-gradient(160deg, rgba(212, 175, 106, 0.06) 0%, rgba(176, 48, 74, 0.04) 100%);
+}
+
+.cardTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  color: var(--color-accent-gold);
+}
+
+.cardBody {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+@media screen and (max-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media screen and (max-width: 640px) {
+  .section {
+    padding: 4rem 1.25rem;
+  }
+
+  .heading {
+    font-size: 1.5rem;
+  }
+}

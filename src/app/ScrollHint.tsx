@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import styles from "./page.module.css";
+import styles from "./Hero.module.css";
 
 /**
  * Fades out once the user starts scrolling, matching a common teaser-page pattern of hinting at

@@ -404,7 +404,7 @@ Status: `IN PROGRESS` (first slice done, live-verified — see below)
 
 ### Features
 
-- [x] Dark immersive hero — `src/app/page.tsx`/`page.module.css`, full-viewport section, dark
+- [x] Dark immersive hero — `src/app/Hero.tsx`/`Hero.module.css`, full-viewport section, dark
   gradient background, centered headline + description, plus a responsive animated background
   (`src/app/HeroBackground.tsx`): two verified public-domain Beethoven portraits cross-fading with
   a slow Ken Burns zoom/pan every ~8s, behind a dark scrim so text stays readable (see ADR-036 for
@@ -413,13 +413,20 @@ Status: `IN PROGRESS` (first slice done, live-verified — see below)
   (Beethoven portraits) rather than the originally-planned original generative orb visual.
 - [x] Live transformation demo — `src/app/DemoForm.tsx` + `src/app/api/demo/compile/route.ts`: a
   no-login textarea → Generate → real (Mock-only, by construction — see ADR-036) compiled result,
-  replacing the earlier static JSON preview card in the scroll-reveal section.
-- [ ] Methodology story
+  now the centerpiece of a dedicated `src/app/CTA.tsx` section.
+- [x] Methodology story — `src/app/Craft.tsx` ("Built on real songwriting craft"): 3 cards on real
+  `docs/METHODOLOGY.md`/`CLAUDE.md` principles (reference-is-function + the 3-difference gate,
+  direct/simple lyrics as a complete option, locked lines survive every revision) — deliberately
+  replaces a fabricated-testimonial section with something true; see ADR-037.
 - [ ] Provider selector
 - [ ] Composition/Lyrics Lab preview
 - [ ] App section
-- [x] Final CTA — fixed pill-shaped Sign up / Log in button bar with a fading scroll-hint chevron
-  (`src/app/ScrollHint.tsx`).
+- [x] Final CTA — `src/app/CTA.tsx`, wrapping `DemoForm`. The page is now a 5-section composition
+  (Hero/Problem/Service/Craft/CTA — `src/app/page.tsx`); Hero's own Sign up/Log in pill bar +
+  fading scroll-hint chevron (`src/app/ScrollHint.tsx`) is scoped to the hero section itself
+  (`position: absolute`, not page-wide `fixed` — see ADR-037/Troubleshooting for why the original
+  fixed positioning broke once more sections existed below it) rather than persisting over every
+  section.
 
 ### Guardrails
 
@@ -429,10 +436,11 @@ Status: `IN PROGRESS` (first slice done, live-verified — see below)
   nypc.co.kr's teaser page; brand assets/copy/licensed font were not. See ADR-035. This override
   does not apply to the remaining Phase 7 items (Orb, live demo, methodology story, etc.), which
   are still free to diverge from NYPC as originally planned.
-- [x] Reduced motion — the scroll-hint bounce and hero Ken-Burns/cross-fade animations inherit the
-  existing global `prefers-reduced-motion` rule in `globals.css`; the cross-fade `setInterval` is
-  additionally skipped entirely in JS when reduced motion is on (not just sped up to ~0). Both
-  live-verified via Playwright (`tests/e2e/landing.spec.ts`).
+- [x] Reduced motion — the scroll-hint bounce, hero Ken-Burns/cross-fade, and the per-section
+  scroll-reveal fade-in (`src/app/Reveal.tsx`) all inherit the existing global
+  `prefers-reduced-motion` rule in `globals.css`; the cross-fade `setInterval` and `Reveal`'s
+  `IntersectionObserver` are additionally skipped entirely in JS when reduced motion is on (not
+  just sped up to ~0). Live-verified via Playwright (`tests/e2e/landing.spec.ts`).
 - [x] Mobile fallback — responsive breakpoints at 1261/1024/640px; live-verified via screenshot at
   375px width with no horizontal overflow.
 - [ ] Performance budget — not measured yet (no Lighthouse run this slice).
@@ -571,10 +579,21 @@ Each requires official capability verification and tests.
    proving the demo works with zero session cookies. Caught and fixed a real gap: the demo's
    `fields.lyrics` came back empty because `MockPromptCompiler` derives it only from
    `lyricsDesign.originalLyrics`, not `northStar` — see `docs/TROUBLESHOOTING.md`.
-10. **Next actual work**: the rest of Phase 7 (methodology story, provider selector, Lab preview,
-    app section, Lighthouse baseline) remains open; other candidates are Phase 6 (Revision Lab),
-    the full 8/14-screen wizard (PRODUCT_SPEC §16), `contrastPlan`/`hookPlan`/`repetitionPlan` UI,
-    or the lock-field UI for `compositionTheory.*Notes` (deferred since Phase 4). A budget-limit
+10. ~~Restructure the landing page into 5 sections (Hero/Problem/Service/Craft/CTA) with
+    grounded copy.~~ Done — ADR-037. New `Problem.tsx`, `Craft.tsx` (replaces a fabricated-
+    testimonial slot with real methodology principles), `Reveal.tsx` (shared scroll-reveal,
+    reduced-motion aware); `Service.tsx` restructures the old feature list into outcome-framed
+    cards; `Hero.tsx`/`CTA.tsx` extracted from the old monolithic `page.tsx`. Two new "artistic"
+    accent tokens (`--color-accent-crimson`/`--color-accent-gold`) extend the palette; CSS Modules
+    kept over Tailwind (no concrete benefit for one page, see ADR-037). Caught and fixed a real
+    layout bug live: Hero's `position: fixed` CTA bar (fine with 2 sections) started overlapping
+    every section below it once there were 5 — changed to `position: absolute` scoped to the hero.
+    All 123 unit tests still pass unchanged; `tests/e2e/landing.spec.ts` extended to assert all 5
+    section headings render.
+11. **Next actual work**: the rest of Phase 7 (Sound Seed Orb, provider selector, Lab preview, app
+    section, Lighthouse baseline) remains open; other candidates are Phase 6 (Revision Lab), the
+    full 8/14-screen wizard (PRODUCT_SPEC §16), `contrastPlan`/`hookPlan`/`repetitionPlan` UI, or
+    the lock-field UI for `compositionTheory.*Notes` (deferred since Phase 4). A budget-limit
     policy decision is still pending before Gemini usage caps can be implemented, and real rate
     limiting is still needed before any anonymous path could ever be allowed to call Gemini
     (see `DECISIONS.md`).

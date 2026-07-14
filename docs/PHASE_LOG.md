@@ -709,4 +709,96 @@ See `DECISIONS.md` ADR-036 (Mock-only demo boundary, image sourcing, the lyrics-
   Gemini — the demo stays Mock-only until then, by design, not as a temporary shortcut.
 - The rest of Phase 7 (methodology story, provider selector, Lab preview, app section, Lighthouse
   baseline) is still open.
+
+---
+
+## Phase 7 (third slice) — 5-section landing page restructure
+
+- Date: 2026-07-14
+- Status: **DONE (first-slice scope), live-verified**
+
+### 한글 요약
+
+- **무엇을 했나**: 사용자가 (Claude Code로 랜딩 페이지 만드는) 유튜브 영상을 본 뒤 스스로 요약해 만든
+  프롬프트 템플릿을 공유하면서, 그 방식을 우리 실제 랜딩 페이지에 적용해달라고 요청했습니다 — Hero/
+  Problem/Service/Testimonial/CTA 5개 섹션 구조, 디자인 시스템, 그리고 구체적인 숫자와 상황이 담긴
+  카피라이팅. 다만 템플릿을 그대로 따르지 않고 두 가지를 의도적으로 다르게 처리했습니다.
+- **가짜 수치를 넣지 않음**: 템플릿의 예시 숫자("효율 40% 절감", "하루 127건", "주 12시간")는 일반적인
+  B2B SaaS 템플릿의 placeholder였지 우리 제품의 실측치가 아니었습니다. 대신 실제로 검증 가능한 사실
+  (7개 이론 엔진, Safe/Balanced/Bold 3개 병렬 전략, 가사 A/B/C 초안 + 잠긴 줄 보존)을 성과 중심 문장으로
+  풀어썼습니다.
+- **가짜 후기를 만들지 않음**: 템플릿은 "구체적인 경험담" 형태의 고객 후기 섹션을 요구했지만, 이 제품은
+  실제 사용자가 아직 없습니다. 이름 붙은 가짜 후기를 실제 것처럼 올리는 건 스타일 선택이 아니라 명백한
+  기만이라 판단해서, 그 자리를 "Built on real songwriting craft" 섹션으로 대체했습니다 — 실제
+  `docs/METHODOLOGY.md`/`CLAUDE.md`에 있는 원칙 3가지(레퍼런스는 표면이 아니라 원리만 추출 + 3개
+  차이 필수, 직설 가사는 완전한 선택지, 잠근 줄은 모든 리비전에서 보존)를 "왜 이렇게 만들었는가"로
+  보여주는 카드 3개입니다. 부제도 정직하게 "마케팅 문구가 아니라 코드로 강제되는 규칙"이라고 적었습니다.
+- **Tailwind 대신 기존 CSS Modules 유지**: 템플릿은 Tailwind를 지정했지만, 이 프로젝트엔 Tailwind가
+  없었고 기존 CSS Modules + 토큰 체계로 이미 히어로/데모 페이지가 잘 동작하고 있었습니다. 페이지 하나
+  때문에 두 번째 스타일링 체계를 들이거나 전체를 마이그레이션할 이유가 없어서 CSS Modules를 그대로
+  확장했습니다. "예술적인 색상"은 기존 보라/청록에 크림슨/골드 토큰을 추가하는 식으로 구현했습니다.
+- **레이아웃/구조는 전적으로 위임받음**: 사용자가 "레이아웃은 너가 알아서, 애니메이션은 영상 요약
+  참고"라고 했는데, 실제로 공유된 텍스트에는 구체적인 애니메이션 기법이 없어서, 스크롤에 따라 각 섹션이
+  서서히 나타나는(fade + slide-up) 표준적인 랜딩 페이지 패턴을 적용했습니다(`Reveal.tsx`,
+  `IntersectionObserver` 기반, reduced-motion 시 애니메이션 없이 바로 보이도록 처리).
+- **실제로 발견한 레이아웃 버그**: 첫 스크린샷에서 히어로의 `position: fixed` CTA 바(Sign up/Log in
+  버튼)가 새로 추가된 Problem 섹션의 텍스트를 그대로 덮고 있는 게 보였습니다 — 섹션이 2개였을 때는
+  "항상 떠 있는 버튼 바"가 자연스러웠지만, 5개 섹션이 생기면서 그 아래 모든 섹션을 계속 가리는 버그가
+  된 것이었습니다. `.ctaBar`를 `position: absolute`(히어로 섹션 기준)로 바꿔서 히어로와 함께 자연스럽게
+  스크롤되어 사라지도록 수정했습니다.
+
+### What shipped
+
+- `src/app/page.tsx` — thin composition of 5 new section components.
+- `src/app/Hero.tsx`/`Hero.module.css` (extracted from the old monolithic `page.tsx`) — headline
+  sharpened to contrast "Suno vs. Udio, described differently" against "one spec, matched output
+  for both"; `.ctaBar` changed from page-wide `position: fixed` to `position: absolute` scoped to
+  `.hero` (the real bug fix above).
+- `src/app/Problem.tsx`/`.module.css` (new) — "without a shared spec" vs. "with Music Prompt
+  Architect" two-column contrast, grounded in real friction (provider-specific prompt shaping,
+  interacting spec fields, lyric lines lost on revision).
+- `src/app/Service.tsx`/`.module.css` — restructures the former `dt`/`dd` feature list into 3
+  outcome-framed cards (Safe/Balanced/Bold, the 7 theory engines, A/B/C lyric drafts).
+- `src/app/Craft.tsx`/`.module.css` (new) — replaces the template's Testimonial slot with 3 cards
+  on real methodology principles; see the 한글 요약 above for why.
+- `src/app/CTA.tsx`/`.module.css` (new) — wraps the existing, unchanged `DemoForm`.
+- `src/app/Reveal.tsx` (new) — shared `IntersectionObserver`-based scroll-reveal, reduced-motion
+  aware via a lazy `useState` initializer (not a synchronous `setState` in `useEffect`, which this
+  project's `react-hooks/set-state-in-effect` lint rule correctly flags).
+- `src/app/globals.css` — two new tokens, `--color-accent-crimson`/`--color-accent-gold`.
+- `tests/e2e/landing.spec.ts` — new case asserting all 5 section headings render.
+
+### Live verification
+
+Against the already-running dev server:
+
+- Screenshots of all 5 sections at desktop width and 3 at 375px mobile width — the first pass
+  caught the CTA-bar overlap bug described above; a second pass after the fix confirmed every
+  section renders cleanly with no overlap, at both widths.
+- Confirmed no horizontal overflow at 375px width scrolled all the way through the page.
+- Existing Playwright cases (no-login demo, reduced-motion, Sign up/Log in navigation) all still
+  pass unchanged, since `DemoForm`/`HeroBackground`/`ScrollHint` themselves weren't rewritten, only
+  relocated into the new section components.
+
+### Verification at time of this entry
+
+- `pnpm typecheck`, `pnpm lint` — pass (lint caught the `set-state-in-effect` issue in `Reveal.tsx`
+  on first pass; fixed before this was "done")
+- `pnpm build` — pass
+- `pnpm test` — 123/123 pass (unchanged — no new pure logic needed a unit test)
+- `pnpm exec playwright test tests/e2e/landing.spec.ts` — 4/4 pass
+- Live walkthrough — pass (see above)
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-037 (5-section restructure, no fabricated stats/testimonials, CSS Modules
+over Tailwind, the fixed-CTA-bar bug).
+
+### Known gaps carried forward
+
+- The rest of Phase 7 (Sound Seed Orb, provider selector, Lab preview, app section, Lighthouse
+  baseline) is still open.
+- Keyboard navigation through the 5 sections wasn't explicitly re-checked this slice.
+- Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first/second slice is still
+  pending.
 - Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first slice is still pending.

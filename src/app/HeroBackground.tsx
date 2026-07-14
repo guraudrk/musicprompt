@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import styles from "./page.module.css";
+import styles from "./Hero.module.css";
 
 /**
  * Two genuinely public-domain Beethoven portraits (painters both died 100+ years ago), not

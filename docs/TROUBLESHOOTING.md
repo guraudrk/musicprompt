@@ -414,3 +414,49 @@ would never appear as a descendant.
 `.locator()` only makes sense for an actual ancestor→descendant relationship; to match multiple
 attributes on one element, put them in a single compound CSS selector instead.
 
+---
+
+## Phase 7 (third slice — 5-section landing page restructure)
+
+### Hero's page-wide fixed CTA bar started overlapping every section below it
+
+**Symptom:** The first screenshot of the newly-added Problem section showed the Sign up/Log in
+button bar (and the scroll-hint arrow) sitting directly on top of the section's text, rather than
+staying inside the hero.
+
+**Cause:** `.ctaBar` was `position: fixed`, which was correct when the page had only 2 sections —
+Hero and one final scroll-reveal section — since there was nowhere else for a "final call to
+action" to float over except the entire remaining page, and that was the point. Once the page grew
+to 5 sections, "fixed to the viewport" started meaning "persists over Problem, Service, and Craft
+too," none of which are the CTA.
+
+**Fix:** Changed `.ctaBar` to `position: absolute`, scoped to `.hero` (which is already
+`position: relative`), so it scrolls away naturally with the hero section instead of persisting
+over the viewport. Removed the compensating extra bottom padding on the CTA section that had
+existed specifically to keep its content clear of the old fixed bar — no longer needed once the
+bar can't reach that section anymore. General lesson: a `position: fixed` element's "correctness"
+is relative to the *number of sections it could end up floating over* — a layout decision that was
+right for a 2-section page can silently become a bug the moment more sections are added below it,
+with no code change to the fixed element itself.
+
+### `react-hooks/set-state-in-effect` flagged `Reveal.tsx`'s reduced-motion early return
+
+**Symptom:** `pnpm lint` failed on a new `Reveal.tsx` component with
+`Calling setState() directly within an effect` for the line
+`if (prefersReducedMotion()) { setVisible(true); return; }` inside `useEffect`.
+
+**Cause:** The lint rule flags any `setState` call made synchronously in an effect's body (as
+opposed to inside an async callback or event listener within that effect), since it forces an
+extra render pass immediately after mount — legitimate for "subscribe to an external system and
+react to its changes" but not for computing an initial value that was already knowable before the
+first render.
+
+**Fix:** Moved the reduced-motion check into `useState`'s lazy initializer
+(`useState(prefersReducedMotion)`) instead of `useEffect` — this runs during the component's first
+client-side render (not inside an effect), so no `setState` call is needed for that branch at all.
+The `IntersectionObserver` path still calls `setVisible` from inside the observer's callback, which
+is the legitimate pattern the rule expects. General lesson: when an effect's only job for one
+branch is "compute a value once, synchronously, from something already available at render time,"
+that's a lazy `useState` initializer, not a `useEffect` — reserve the effect for the part that
+genuinely subscribes to an external, asynchronous event source.
+

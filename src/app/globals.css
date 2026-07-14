@@ -14,6 +14,11 @@
   --color-success: #34e0a1;
   --color-warning: #f4c542;
 
+  /* Painterly accent pair for landing-page surfaces (Phase 7) — deep crimson/antique gold,
+     evoking the classical portrait art in the hero rather than typical SaaS blue/green. */
+  --color-accent-crimson: #b0304a;
+  --color-accent-gold: #d4af6a;
+
   --font-sans: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   --font-mono: var(--font-geist-mono), monospace;
 }
@@ -76,4 +81,18 @@ a {
   html {
     color-scheme: dark;
   }
+}
+
+/* Shared scroll-reveal transition (src/app/Reveal.tsx). The `prefers-reduced-motion` rule above
+   already collapses this transition's duration to ~0; `Reveal` additionally marks content visible
+   immediately in that case rather than relying on the collapsed-duration transition alone. */
+.reveal {
+  opacity: 0;
+  transform: translateY(1.25rem);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.reveal[data-visible="true"] {
+  opacity: 1;
+  transform: translateY(0);
 }

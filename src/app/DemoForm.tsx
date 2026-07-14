@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { MusicAIPromptPackage } from "@/domain/promptPackage/schema";
-import styles from "./page.module.css";
+import styles from "./CTA.module.css";
 
 /**
  * No-login demo: calls the Mock-only /api/demo/compile endpoint (see that route's comment for why

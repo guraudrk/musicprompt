@@ -17,6 +17,15 @@ test("landing page navigates to signup and login", async ({ page }) => {
   await expect(page).toHaveURL(/\/signup$/);
 });
 
+test("landing page renders all 5 sections", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /One idea/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Ask two AIs for the same song/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /What actually happens between your idea/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Built on real songwriting craft/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Try it right now/ })).toBeVisible();
+});
+
 test("landing page respects prefers-reduced-motion", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");

@@ -775,6 +775,74 @@ the demo route only set `northStar.audienceExperience`, so every demo result sil
 
 ---
 
+## ADR-037 — Landing page restructured into 5 sections; no fabricated stats or testimonials; CSS Modules kept over Tailwind
+
+- Status: Accepted
+- Date: 2026-07-14
+
+### Decision
+
+The user shared a generic prompt template (their own summary of a "build a landing page with
+Claude Code" tutorial) asking for a 5-section structure (Hero / Problem / Service / Testimonial /
+CTA) with copy grounded in specific numbers and situations. `src/app/page.tsx` is now a thin
+composition of 5 section components, each with its own co-located CSS module:
+`Hero.tsx`/`.module.css`, `Problem.tsx`/`.module.css` (new), `Service.tsx`/`.module.css` (restructures
+the former `detailList` into outcome-framed cards), `Craft.tsx`/`.module.css` (new — see below),
+`CTA.tsx`/`.module.css` (wraps the existing `DemoForm` unchanged). A shared `Reveal.tsx` component
+(`IntersectionObserver`-based fade+slide-up, reduced-motion aware via a lazy `useState` initializer
+rather than a synchronous `setState` call in `useEffect` — the latter is flagged by this project's
+`react-hooks/set-state-in-effect` lint rule) wraps each section below the hero.
+
+Two things in the template were **not followed literally**, on integrity grounds:
+
+- The template's example pain-point numbers ("효율 40% 절감," "127건," "12시간") are generic
+  B2B-SaaS placeholders, not measured facts about this product. The Problem/Service copy instead
+  uses concrete, true claims about what the system actually, verifiably does (7 named theory
+  engines, 3 parallel strategies, A/B/C lyric drafts with locked-line preservation) rather than
+  invented metrics.
+- The template's Testimonial section asks for first-person customer quotes. This product has no
+  real users yet — fabricating named quotes and presenting them as genuine would be a real
+  deception on a live page, the same "never fabricate reviews/testimonials presented as genuine"
+  boundary that applies to anything published, not a stylistic call. That slot is replaced with
+  **Craft** — three real principles pulled from `docs/METHODOLOGY.md`/`CLAUDE.md` (reference is
+  function not surface copy + the 3-difference gate; direct/simple lyrics as a complete option;
+  locked lines survive every revision), framed as "why this exists" and truthfully subtitled "not
+  marketing claims — rules enforced in the code."
+
+The template specified Tailwind CSS; this project keeps **CSS Modules** instead. There was no
+Tailwind dependency before this task, the existing token layer in `globals.css` (dark theme,
+accent palette, responsive breakpoints, the global `prefers-reduced-motion` rule) already built
+the whole landing page successfully, and introducing a second styling system (or a full-site
+migration) for one page has no concrete benefit here — "새 Dependency는 이유가 있을 때만 추가한다"
+(the self-directed manual, and CLAUDE.md's engineering defaults in spirit). The requested
+"artistic" color direction is realized as two new tokens, `--color-accent-crimson`/
+`--color-accent-gold` (`globals.css`), extending — not replacing — the existing purple/teal pair,
+picked to tie into the Beethoven portrait hero art already in place rather than typical SaaS
+blue/green.
+
+### Reason
+
+The user explicitly delegated layout and asked for "artistic" colors without specifying an exact
+palette, and gave standing autonomy for this task ("중간중간에 확인받을 필요 없어... 오류만 아니면
+스스로 진행해줘") — these are the "choose a reasonable low-risk default and record it" calls the
+self-directed manual describes, not decisions requiring a fresh question each time. The two
+integrity departures above (no fake stats, no fake testimonials) are not close calls and were made
+without asking, consistent with the manual's own instruction not to fold every judgment call back
+into a question.
+
+### Consequence (live-verified layout bug found and fixed)
+
+The first screenshot pass showed Hero's CTA bar (`position: fixed`, inherited from when the page
+had only 2 sections and a page-wide floating bar made sense) overlapping the Problem section's
+text — with 5 sections now on the page, anything `position: fixed` persists over all of them, not
+just the hero. Fixed by changing `.ctaBar` to `position: absolute` scoped to `.hero` (which is
+`position: relative`), so it scrolls away naturally with the hero section instead of floating over
+everything below it; the compensating extra bottom padding on the CTA section (previously needed
+to keep content clear of the old fixed bar) was removed since it's no longer needed. See
+`docs/TROUBLESHOOTING.md`.
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:
