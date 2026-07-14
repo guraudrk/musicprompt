@@ -45,3 +45,67 @@ See `DECISIONS.md` ADR-019 through ADR-023.
 - No ORM/auth/DB/CI yet (Phase 2).
 - `GEMINI_API_MODE` value is an unverified placeholder (must verify before Phase 3 real wiring,
   per ADR-007).
+
+---
+
+## Phase 2 — Persistence, auth, and core web flow (first slice)
+
+- Date: 2026-07-14
+- Status: **code-complete, not fully live-verified** (see "Known gaps" below — this matters more
+  than usual for this entry, read it before trusting the checklist in `IMPLEMENTATION_PLAN.md`).
+
+### What shipped
+
+- Prisma 7 schema (`User`, `Project`, `ProjectVersion`, `PromptPackage`) + `@prisma/adapter-pg`
+  driver adapter (`src/lib/prisma.ts`) — Prisma 7 dropped `url` from `datasource` blocks, so the
+  CLI reads `DATABASE_URL` from `prisma.config.ts` (pointed at `.env.local`, not the default
+  `.env`, to keep one source of truth with the Next.js app).
+- `PrismaProjectRepository` implementing the same `ProjectRepository` interface Phase 1 defined
+  (`InMemoryProjectRepository` stays for pure unit tests) — `ProjectRepository` became async to
+  accommodate real I/O.
+- Auth.js v5 beta, Credentials provider (email + bcryptjs), JWT sessions, no OAuth adapter
+  (`src/auth.ts`) + `/api/auth/signup`.
+- Project CRUD, autosave (PATCH bumps version server-side), compile (`compile/{providerId}` and
+  `compile/compare`, wired to the existing Mock pipeline — Gemini stays a skeleton), and TXT/JSON
+  export API routes, all enforcing per-user ownership (`src/lib/authz.ts`).
+- One dense project page (`/projects/[id]`) instead of the full 8-screen wizard — North Star,
+  minimal music identity, lyrics + locked lines, provider selection, Safe/Balanced/Bold results
+  with copy-to-clipboard, export links. Plus `/signup`, `/login`, `/dashboard`.
+- `docker-compose.yml` for local Postgres.
+- New unit tests: `PrismaProjectRepository` against a hand-written fake Prisma Client, and
+  `/api/projects/[projectId]` route ownership/version-bump behavior against a mocked session +
+  repository. Total: 25 unit tests (up from 18).
+- `tests/e2e/happy-path.spec.ts` (Playwright) — signup → create → edit → compile → copy/export.
+
+### Verification at time of this entry
+
+Actually run in this sandbox:
+- `pnpm typecheck` — pass
+- `pnpm lint` — pass
+- `pnpm test` — 25/25 pass
+- `pnpm build` — pass (all routes compiled, including the new dynamic API routes)
+- `pnpm exec prisma generate` — pass (schema is valid; does not require a live DB connection)
+
+**Not run here — no Docker/Postgres/psql available in this sandbox:**
+- `pnpm prisma migrate dev` (never applied against a real database)
+- The actual signup → create project → compile → reload → export walkthrough
+- `pnpm test:e2e` (Playwright was never launched)
+
+So "another user cannot access it" and "reloading preserves the project" are enforced in code and
+covered by mocked/faked unit tests, but not confirmed against a real second account or a real
+reload. Whoever runs this next on a machine with Docker should do the walkthrough in
+`README.md`'s "로컬에서 DB 붙여서 확인하기" section before trusting this phase is fully done.
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-024 through ADR-027.
+
+### Known gaps carried forward
+
+- Full 8-screen wizard UI, reference/deliberate-differences editing, structure/emotion-curve
+  editing — not exposed in this slice's single-page form (schema/backend already support them).
+- True optimistic-concurrency conflict rejection — this slice always overwrites with a
+  server-incremented version instead of rejecting stale client writes.
+- DB hosting, deployment platform, logging/observability, rate limiting, background jobs — still
+  pending (see `DECISIONS.md`).
+- Live DB verification of this phase's own definition-of-done items (see above).

@@ -16,10 +16,15 @@
 
 ## 현재 상태
 
-**Phase 0–1 (첫 벌티컬 슬라이스) 완료.** `SongDesignSpec` Zod 스키마, Generic/Suno/Udio Provider Registry,
+**Phase 0–2 (1차 슬라이스) 코드 완료.** `SongDesignSpec` Zod 스키마, Generic/Suno/Udio Provider Registry,
 Mock LLM Provider/Compiler/Evaluator, Gemini Provider 인터페이스(서버 전용 골격, 실제 네트워크 호출 없음),
-Safe/Balanced/Bold Mock 컴파일 파이프라인이 구현되어 있습니다. 인증·DB 영속성·실제 Gemini 연동·전체 웹 UI는
-아직 없습니다 (Phase 2–3 예정). 상세는 [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) 참고.
+Safe/Balanced/Bold Mock 컴파일 파이프라인, Auth.js 이메일/비밀번호 인증, Prisma/Postgres 영속성, 프로젝트
+CRUD·컴파일·내보내기 API, 단일 페이지 프로젝트 편집기가 구현되어 있습니다. 전체 8단계 위저드 UI·실제 Gemini
+연동·PWA/모바일은 아직 없습니다 (Phase 2 후반·Phase 3+ 예정).
+
+이 저장소가 만들어진 개발 환경에는 Docker/Postgres가 없어 마이그레이션 적용과 실제 회원가입→컴파일→내보내기
+흐름, Playwright E2E는 로컬에서 직접 실행해 확인해야 합니다 (아래 "로컬에서 DB 붙여서 확인하기" 참고).
+상세는 [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md)와 [`docs/PHASE_LOG.md`](docs/PHASE_LOG.md) 참고.
 
 ## 시작하기
 
@@ -32,6 +37,17 @@ pnpm build       # 프로덕션 빌드
 pnpm typecheck   # TypeScript strict 검사
 pnpm lint        # ESLint
 pnpm test        # Vitest 단위 테스트
+```
+
+## 로컬에서 DB 붙여서 확인하기
+
+```bash
+docker compose up -d                        # 로컬 Postgres 실행
+pnpm prisma migrate dev --name init          # 마이그레이션 적용
+pnpm dev                                     # 개발 서버 (회원가입 -> 프로젝트 생성 -> 컴파일 -> 내보내기)
+
+pnpm exec playwright install
+pnpm test:e2e                                # Playwright happy-path 테스트
 ```
 
 ## 보안

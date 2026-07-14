@@ -1,0 +1,22 @@
+# Local development Postgres only (DECISIONS.md ADR-027). Not used in this sandbox session — no
+# Docker was available here — but this is what a developer runs locally:
+#
+#   docker compose up -d
+#   pnpm prisma migrate dev --name init
+#
+# Hosted DB / deployment platform choice is still a pending decision (see DECISIONS.md).
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: music_prompt_architect
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:

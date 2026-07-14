@@ -1,0 +1,66 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// Prisma 7: no `url` here. The Prisma CLI (migrate/studio) reads the URL from prisma.config.ts;
+// the application passes a driver adapter (@prisma/adapter-pg) to `new PrismaClient({ adapter })`
+// (see src/lib/prisma.ts) — see https://pris.ly/d/prisma7-client-config.
+datasource db {
+  provider = "postgresql"
+}
+
+// Phase 2 first slice (see IMPLEMENTATION_PLAN.md, DECISIONS.md ADR-024/025). Trimmed from the
+// full ERD in docs/ARCHITECTURE.md: no ProviderProfile table (provider profiles stay versioned
+// code/seed data per ADR-003, not DB rows) and no EvaluationReport/RevisionLog tables yet
+// (quality report is stored inline as JSON on PromptPackage; RevisionLog is Phase 6).
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  projects     Project[]
+}
+
+model Project {
+  id             String           @id @default(cuid())
+  ownerId        String
+  owner          User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  currentVersion Int              @default(1)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  versions       ProjectVersion[]
+  promptPackages PromptPackage[]
+
+  @@index([ownerId])
+}
+
+model ProjectVersion {
+  id             String   @id @default(cuid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  version        Int
+  songDesignSpec Json
+  createdAt      DateTime @default(now())
+
+  @@unique([projectId, version])
+}
+
+model PromptPackage {
+  id                     String   @id @default(cuid())
+  projectId              String
+  project                Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  providerId             String
+  providerProfileVersion String
+  strategy               String
+  fields                 Json
+  warnings               Json
+  promptQuality          Json
+  createdAt              DateTime @default(now())
+
+  @@index([projectId])
+}

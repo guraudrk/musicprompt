@@ -383,14 +383,96 @@ Prevents future contributors from treating these as two different pipelines to r
 
 ---
 
+## ADR-024 — Phase 2 scope trimmed to one dense project page
+
+- Status: Accepted
+- Date: 2026-07-14
+
+### Decision
+
+Phase 2's first slice ships auth, Postgres persistence, project CRUD/autosave/versioning, and one
+dense project page (North Star, minimal music identity, lyrics, provider selection, compile
+results) instead of the full 8-screen wizard in `docs/PRODUCT_SPEC.md` §16.
+
+### Reason
+
+Full Phase 2 as originally scoped (8+ screens, deployment-ready hosting) is too large for one
+slice (CLAUDE.md: "do not implement every phase in one turn"). The multi-screen wizard and visual
+polish remain a later Phase 2-tail / Phase 7 slice — tracked, not dropped.
+
+---
+
+## ADR-025 — Prisma as ORM/migration tool
+
+- Status: Accepted
+- Date: 2026-07-14
+
+### Decision
+
+Use Prisma (v7) with the `@prisma/adapter-pg` driver adapter for Postgres access. Prisma 7 removed
+the `url` field from `datasource` blocks in `schema.prisma`; the Prisma CLI reads
+`DATABASE_URL` from `prisma.config.ts` (which loads `.env.local`, not `.env`, to share one source
+of truth with the Next.js app — see `prisma.config.ts`), and the application passes a
+`PrismaPg` adapter to `new PrismaClient({ adapter })` (see `src/lib/prisma.ts`).
+
+### Reason
+
+User-selected (over Drizzle) for its migration tooling and Next.js/Postgres documentation depth.
+
+### Consequence
+
+The generated client lives in `src/generated/prisma` (Prisma 7's new default location, gitignored)
+rather than inside `node_modules`. `pnpm install` regenerates it via a `postinstall` script.
+
+---
+
+## ADR-026 — Auth.js v5 (beta), Credentials + JWT, no OAuth adapter
+
+- Status: Accepted
+- Date: 2026-07-14
+
+### Decision
+
+Use `next-auth@beta` (Auth.js v5.0.0-beta.31) with the Credentials provider (email + bcryptjs
+password hash) and JWT sessions. No `@auth/prisma-adapter` is used — `authorize()` looks up and
+verifies the user directly via Prisma, which is sufficient without OAuth/database sessions.
+
+### Reason
+
+User-selected. v5 (even in beta) is the version built for Next.js App Router; v4 targets Pages
+Router primarily. "Basic authentication" is all CLAUDE.md's MVP boundary requires.
+
+### Consequence
+
+Revisit when Auth.js v5 reaches GA — pin/upgrade deliberately, don't let it drift silently.
+
+---
+
+## ADR-027 — Local dev Postgres via docker-compose; hosting still pending
+
+- Status: Accepted
+- Date: 2026-07-14
+
+### Decision
+
+`docker-compose.yml` provides a one-command local Postgres for development
+(`docker compose up -d`). Hosted database and deployment platform remain undecided.
+
+### Reason
+
+This session's sandbox has no Docker/Postgres/psql available, so migrations and a live
+signup-to-export walkthrough could not be run or verified here — only `prisma generate` (schema
+validity, no live connection needed), typecheck, lint, unit tests (against fakes/mocks), and
+`next build` were verified. The live walkthrough and `pnpm test:e2e` are documented as a manual
+follow-up for a machine that has Docker/Postgres (see `docs/PHASE_LOG.md`).
+
+---
+
 ## Pending decisions
 
-The following must be decided after repository inspection, and remain open (out of scope for the
-first vertical slice — Phase 0/1):
+The following must be decided after repository inspection, and remain open:
 
-- ORM and migration tool (needed starting Phase 2, when persistence is built)
-- Authentication provider (needed starting Phase 2)
-- Database hosting
+- Database hosting (production/staging)
 - Deployment platform
 - `GEMINI_API_MODE` value and current Gemini model — `.env.example` currently has
   `GEMINI_API_MODE=interactions`, which is a placeholder not defined by any source document or

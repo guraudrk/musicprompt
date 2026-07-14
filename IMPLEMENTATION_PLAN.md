@@ -134,32 +134,45 @@ The Mock compiler is deterministic (`src/llm/mock/`).
 
 ## Phase 2 — Project persistence and core web flow
 
-Status: `TODO`
+Status: `IN PROGRESS` (first-slice scope code-complete; live DB verification pending — see note)
+
+Scope for this slice is trimmed to one dense project page rather than the full 8-screen wizard
+(ADR-024). This sandbox has no Docker/Postgres/psql, so items marked "code-complete, not live
+tested" below could not be run here — see `docs/PHASE_LOG.md` for exactly what was and wasn't
+verified, and what the follow-up commands are.
 
 ### Features
 
-- Authentication
-- Project ownership
-- Project CRUD
-- Autosave
-- Version number
-- Optimistic concurrency or equivalent conflict handling
-- North Star screen
-- Reference principles and deliberate differences
-- Basic music identity
-- Basic structure and emotion curve
-- Basic lyric mode
-- Provider selection
-- Prompt results
-- Copy
-- TXT/JSON export
+- [x] Authentication — Auth.js v5 beta, Credentials provider, JWT sessions (`src/auth.ts`, ADR-026)
+- [x] Project ownership — enforced in `src/lib/authz.ts`, checked by every `/api/projects*` route
+- [x] Project CRUD — `PrismaProjectRepository` (`src/domain/project/prismaProjectRepository.ts`) + `/api/projects*` routes
+- [x] Autosave — `PATCH /api/projects/{id}` (called from the project page's Save button)
+- [x] Version number — `Project.currentVersion` / `ProjectVersion.version`
+- [ ] Optimistic concurrency — deliberately simplified this slice: PATCH always increments
+  server-side and overwrites; no conflict rejection on stale client version (documented
+  simplification, not silently dropped — see ADR-024)
+- [x] North Star screen — folded into the single project page, not a separate step
+- [ ] Reference principles and deliberate differences — not exposed in the UI form this slice
+  (schema/back end already support it; editable only via direct API/JSON for now)
+- [x] Basic music identity — genres/tempo/instrumentation fields on the project page
+- [ ] Basic structure and emotion curve — not exposed in the UI form this slice (same as above)
+- [x] Basic lyric mode — mode select + lyrics text + locked lines on the project page
+- [x] Provider selection — generic/suno/udio checkboxes
+- [x] Prompt results — Safe/Balanced/Bold shown after Compile, persisted to `PromptPackage` rows
+- [x] Copy — per-strategy copy-to-clipboard button
+- [x] TXT/JSON export — `GET /api/projects/{id}/export/txt|json`
 
 ### Definition of done
 
-- A user completes the full Mock flow.
-- Reloading preserves the project.
-- Another user cannot access it.
-- Playwright covers the happy path.
+- [ ] A user completes the full Mock flow. — code-complete (signup → create → edit → compile →
+  copy/export), **not live-executed** in this sandbox (no Postgres). Manual follow-up:
+  `docker compose up -d && pnpm prisma migrate dev --name init && pnpm dev`, then walk through it.
+- [ ] Reloading preserves the project. — implied by Postgres persistence; not live-verified here.
+- [ ] Another user cannot access it. — enforced in code (`requireOwnedProject` returns 403) and
+  covered by a unit test with a mocked session/repository (`tests/unit/apiProjectRoute.test.ts`);
+  not exercised against a real second account here.
+- [ ] Playwright covers the happy path. — `tests/e2e/happy-path.spec.ts` is written but **not run**
+  in this session. Manual follow-up: `pnpm exec playwright install && pnpm test:e2e`.
 
 ---
 

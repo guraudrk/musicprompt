@@ -1,29 +1,32 @@
 import type { Project } from "./schema";
 import type { SongDesignSpec } from "@/domain/songDesignSpec/schema";
 
+/**
+ * Async because Phase 2 adds a real Postgres-backed implementation (PrismaProjectRepository)
+ * alongside the in-memory one used by Phase 0-1's pipeline tests (ADR-002: swappable backends
+ * behind a stable domain interface).
+ */
 export interface ProjectRepository {
-  create(input: { ownerId: string; spec: SongDesignSpec }): Project;
-  get(id: string): Project | undefined;
-  list(ownerId: string): Project[];
+  create(input: { ownerId: string; spec: SongDesignSpec }): Promise<Project>;
+  get(id: string): Promise<Project | undefined>;
+  list(ownerId: string): Promise<Project[]>;
   /** Replaces the spec and increments currentVersion. Returns undefined if the project doesn't exist. */
-  update(id: string, spec: SongDesignSpec): Project | undefined;
-  delete(id: string): boolean;
+  update(id: string, spec: SongDesignSpec): Promise<Project | undefined>;
+  delete(id: string): Promise<boolean>;
 }
 
-let nextId = 1;
-
 /**
- * In-memory implementation for the first slice and unit tests. Phase 2 replaces this with a
- * Postgres-backed repository behind the same interface (ADR-002: providers/backends change
- * without touching domain logic).
+ * In-memory implementation for unit tests and any code path that doesn't need real persistence.
+ * `PrismaProjectRepository` (src/domain/project/prismaProjectRepository.ts) is the Postgres-backed
+ * implementation used by the API routes.
  */
 export class InMemoryProjectRepository implements ProjectRepository {
   private readonly projects = new Map<string, Project>();
 
-  create(input: { ownerId: string; spec: SongDesignSpec }): Project {
+  async create(input: { ownerId: string; spec: SongDesignSpec }): Promise<Project> {
     const now = new Date().toISOString();
     const project: Project = {
-      id: String(nextId++),
+      id: input.spec.projectId,
       ownerId: input.ownerId,
       currentVersion: input.spec.version,
       spec: input.spec,
@@ -34,15 +37,15 @@ export class InMemoryProjectRepository implements ProjectRepository {
     return project;
   }
 
-  get(id: string): Project | undefined {
+  async get(id: string): Promise<Project | undefined> {
     return this.projects.get(id);
   }
 
-  list(ownerId: string): Project[] {
+  async list(ownerId: string): Promise<Project[]> {
     return [...this.projects.values()].filter((p) => p.ownerId === ownerId);
   }
 
-  update(id: string, spec: SongDesignSpec): Project | undefined {
+  async update(id: string, spec: SongDesignSpec): Promise<Project | undefined> {
     const existing = this.projects.get(id);
     if (!existing) return undefined;
     const updated: Project = {
@@ -55,7 +58,7 @@ export class InMemoryProjectRepository implements ProjectRepository {
     return updated;
   }
 
-  delete(id: string): boolean {
+  async delete(id: string): Promise<boolean> {
     return this.projects.delete(id);
   }
 }
