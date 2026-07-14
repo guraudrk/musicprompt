@@ -134,12 +134,10 @@ The Mock compiler is deterministic (`src/llm/mock/`).
 
 ## Phase 2 — Project persistence and core web flow
 
-Status: `IN PROGRESS` (first-slice scope code-complete; live DB verification pending — see note)
+Status: `DONE` (first-slice scope, live-verified against a real local Postgres via Docker)
 
 Scope for this slice is trimmed to one dense project page rather than the full 8-screen wizard
-(ADR-024). This sandbox has no Docker/Postgres/psql, so items marked "code-complete, not live
-tested" below could not be run here — see `docs/PHASE_LOG.md` for exactly what was and wasn't
-verified, and what the follow-up commands are.
+(ADR-024).
 
 ### Features
 
@@ -164,15 +162,19 @@ verified, and what the follow-up commands are.
 
 ### Definition of done
 
-- [ ] A user completes the full Mock flow. — code-complete (signup → create → edit → compile →
-  copy/export), **not live-executed** in this sandbox (no Postgres). Manual follow-up:
-  `docker compose up -d && pnpm prisma migrate dev --name init && pnpm dev`, then walk through it.
-- [ ] Reloading preserves the project. — implied by Postgres persistence; not live-verified here.
-- [ ] Another user cannot access it. — enforced in code (`requireOwnedProject` returns 403) and
-  covered by a unit test with a mocked session/repository (`tests/unit/apiProjectRoute.test.ts`);
-  not exercised against a real second account here.
-- [ ] Playwright covers the happy path. — `tests/e2e/happy-path.spec.ts` is written but **not run**
-  in this session. Manual follow-up: `pnpm exec playwright install && pnpm test:e2e`.
+- [x] A user completes the full Mock flow. — live-verified: signup → create project → edit North
+  Star/lyrics/locked lines → autosave (PATCH) → compile/compare (generic provider) →
+  Safe/Balanced/Bold returned with locked lyric line preserved → TXT/JSON export, all against a
+  real Postgres (`docker compose up -d && pnpm prisma migrate dev --name init`).
+- [x] Reloading preserves the project. — verified: PATCH bumped the version, a subsequent GET
+  returned the updated title/spec from the database.
+- [x] Another user cannot access it. — verified with two real signed-up accounts: user 2's GET on
+  user 1's project returned 403; also covered by a unit test with a mocked session/repository
+  (`tests/unit/apiProjectRoute.test.ts`).
+- [x] Playwright covers the happy path. — `tests/e2e/happy-path.spec.ts` runs and passes
+  (`pnpm test:e2e`) against the live dev server + database. Fixed two real issues it caught: a
+  locator ambiguity and a missing clipboard-permission grant/error handling — see
+  `docs/TROUBLESHOOTING.md`.
 
 ---
 
@@ -460,10 +462,13 @@ Each requires official capability verification and tests.
 
 ## Immediate next task
 
-1. ~~Complete Phase 0.~~ Done for first-slice scope; DB/CI items remain (see Phase 0 checklist).
-2. ~~Complete the schemas and Mock compiler from Phase 1.~~ Done — `pnpm typecheck`, `pnpm lint`,
-   `pnpm test` (18 tests), and `pnpm build` all pass.
-3. **Stop and review this vertical slice before connecting Gemini.** Next actual work is Phase 2
-   (auth, Postgres persistence, ORM choice, core web screens) — do not start real Gemini wiring
-   (Phase 3) until `GEMINI_API_MODE` and the current official Google GenAI SDK shape are verified
-   (ADR-007).
+1. ~~Complete Phase 0.~~ Done for first-slice scope; CI is still the one open item (see Phase 0 checklist).
+2. ~~Complete the schemas and Mock compiler from Phase 1.~~ Done — 18 unit tests, typecheck/lint/build all pass.
+3. ~~Complete Phase 2 first slice and live-verify it.~~ Done — 25 unit tests + a live walkthrough
+   against a real Docker Postgres (signup, CRUD, autosave, compile, export, cross-user ownership
+   denial) + a passing Playwright run. See `docs/PHASE_LOG.md` and `docs/TROUBLESHOOTING.md`.
+4. **Next actual work**: either the Phase 2-tail UI (reference/deliberate-differences,
+   structure/emotion-curve editing, full 8-screen wizard) or Phase 3 (Gemini). Do not start real
+   Gemini wiring until `GEMINI_API_MODE` and the current official Google GenAI SDK shape are
+   verified (ADR-007) — that verification itself should be the first step of Phase 3, not an
+   afterthought.

@@ -125,9 +125,13 @@ export function ProjectEditor({ project }: { project: Project }) {
   }
 
   async function copyToClipboard(key: string, text: string) {
-    await navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey((current) => (current === key ? null : current)), 2000);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey((current) => (current === key ? null : current)), 2000);
+    } catch {
+      setCompileError("Couldn't copy to clipboard. Your browser may be blocking clipboard access.");
+    }
   }
 
   function toggleProvider(providerId: string) {

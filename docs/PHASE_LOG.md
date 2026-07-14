@@ -51,8 +51,9 @@ See `DECISIONS.md` ADR-019 through ADR-023.
 ## Phase 2 — Persistence, auth, and core web flow (first slice)
 
 - Date: 2026-07-14
-- Status: **code-complete, not fully live-verified** (see "Known gaps" below — this matters more
-  than usual for this entry, read it before trusting the checklist in `IMPLEMENTATION_PLAN.md`).
+- Status: **DONE, live-verified** (see "Live verification" addendum below — the user installed
+  Docker Desktop specifically so this phase could be tested against a real Postgres instead of
+  staying at "code-complete, not run" indefinitely).
 
 ### What shipped
 
@@ -96,6 +97,32 @@ covered by mocked/faked unit tests, but not confirmed against a real second acco
 reload. Whoever runs this next on a machine with Docker should do the walkthrough in
 `README.md`'s "로컬에서 DB 붙여서 확인하기" section before trusting this phase is fully done.
 
+### Live verification (same day, after Docker Desktop was installed)
+
+The user installed Docker Desktop specifically to close the gap above. Ran, on this same machine:
+
+1. `docker compose up -d` — Postgres container up, `pg_isready` confirmed.
+2. `pnpm prisma migrate dev --name init` — first attempt failed with `P1000: Authentication
+   failed ... for USER` because `.env.local`'s `DATABASE_URL` still had the pre-Docker placeholder
+   credentials; fixed to match `docker-compose.yml`'s `postgres:postgres`, then migration applied
+   cleanly. Confirmed via `psql \dt`: `User`, `Project`, `ProjectVersion`, `PromptPackage`,
+   `_prisma_migrations` all created.
+3. `pnpm dev`, then exercised the real API with `curl` end-to-end: signup → CSRF-token login →
+   `/api/auth/session` confirmed → create project → PATCH (edited North Star, working title,
+   locked lyric line; version 1 → 2, confirmed via a follow-up GET) → `compile/compare` for
+   `generic` (Safe/Balanced/Bold returned, each with the locked lyric line intact, each with a
+   different `style` string) → TXT and JSON export both returned correctly.
+4. Signed up a **second** real account and confirmed `GET /api/projects/{id}` on the first user's
+   project returns `403`, and the second user's own project list is empty.
+5. `pnpm exec playwright install chromium` then `pnpm test:e2e` — failed twice, fixed both (see
+   `docs/TROUBLESHOOTING.md`: a locator ambiguity in the test itself, and a missing clipboard
+   permission grant + missing error handling in `ProjectEditor.tsx`'s copy button, which was a real
+   app gap, not just a test bug). Third run passed.
+
+All four `IMPLEMENTATION_PLAN.md` Phase 2 "Definition of done" items are now checked off for real,
+not just asserted. A full technical-issues write-up (this phase and Phase 0-1 combined) is in
+`docs/TROUBLESHOOTING.md`.
+
 ### Decisions recorded
 
 See `DECISIONS.md` ADR-024 through ADR-027.
@@ -108,4 +135,3 @@ See `DECISIONS.md` ADR-024 through ADR-027.
   server-incremented version instead of rejecting stale client writes.
 - DB hosting, deployment platform, logging/observability, rate limiting, background jobs — still
   pending (see `DECISIONS.md`).
-- Live DB verification of this phase's own definition-of-done items (see above).

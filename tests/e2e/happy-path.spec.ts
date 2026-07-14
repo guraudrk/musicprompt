@@ -30,9 +30,9 @@ test("signup, create project, compile, and export", async ({ page }) => {
   await page.getByRole("button", { name: "Save" }).click();
 
   await page.getByRole("button", { name: /Compile/ }).click();
-  await expect(page.getByText("safe")).toBeVisible();
-  await expect(page.getByText("balanced")).toBeVisible();
-  await expect(page.getByText("bold")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "safe" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "balanced" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "bold" })).toBeVisible();
 
   await page.getByRole("button", { name: "Copy" }).first().click();
   await expect(page.getByRole("button", { name: "Copied!" }).first()).toBeVisible();

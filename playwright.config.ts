@@ -19,5 +19,8 @@ export default defineConfig({
   },
   use: {
     baseURL: "http://localhost:3000",
+    // The project page's Copy button uses navigator.clipboard.writeText; Chromium blocks that
+    // without an explicit grant.
+    permissions: ["clipboard-read", "clipboard-write"],
   },
 });
