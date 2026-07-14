@@ -1,0 +1,119 @@
+import type { SongDesignSpec } from "@/domain/songDesignSpec/schema";
+import type { ProviderCapabilityProfile } from "@/domain/providerCapability/schema";
+import type { ProviderRegistry } from "@/providers/registry";
+import type { PromptCompiler, PromptEvaluator, ProviderCompilerInput } from "./types";
+import { MusicAIPromptPackageSchema, type MusicAIPromptPackage, type Strategy } from "@/domain/promptPackage/schema";
+
+export type CompilePipelineDeps = {
+  registry: ProviderRegistry;
+  compiler: PromptCompiler;
+  evaluator: PromptEvaluator;
+};
+
+export type CompilePipelineResult = {
+  package: MusicAIPromptPackage;
+  repaired: boolean;
+};
+
+function validatePackage(
+  spec: SongDesignSpec,
+  provider: ProviderCapabilityProfile,
+  pkg: MusicAIPromptPackage,
+): { ok: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  // Stage E: schema validity.
+  const parsed = MusicAIPromptPackageSchema.safeParse(pkg);
+  if (!parsed.success) {
+    errors.push(...parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`));
+  }
+
+  // Stage E: locked lyric lines must survive compile (CLAUDE.md §3, PRODUCT_SPEC §9.2 Stage E).
+  for (const line of spec.lyricsDesign.lockedLines) {
+    if (!(pkg.fields.lyrics ?? "").includes(line)) {
+      errors.push(`Locked lyric line was not preserved: "${line}"`);
+    }
+  }
+
+  // Stage E: required provider fields must be present.
+  const fields = pkg.fields as Record<string, unknown>;
+  for (const requiredField of provider.promptSchema.requiredFields) {
+    const value = fields[requiredField];
+    if (value === undefined || value === null || value === "") {
+      errors.push(`Required field "${requiredField}" for provider "${provider.providerId}" is missing.`);
+    }
+  }
+
+  return { ok: errors.length === 0, errors };
+}
+
+/**
+ * Orchestrates PRODUCT_SPEC.md §9.2 Stage C through H for one provider + strategy. Stage A
+ * (normalization) is assumed to have already produced `spec`. Stage B (theory enrichment) is a
+ * pass-through stub in this slice: `spec.compositionTheory` is used as-is, since the real engines
+ * are Phase 4 (see IMPLEMENTATION_PLAN.md).
+ */
+export async function compilePromptPackage(
+  spec: SongDesignSpec,
+  providerId: string,
+  strategy: Strategy,
+  deps: CompilePipelineDeps,
+): Promise<CompilePipelineResult> {
+  // Stage C: provider projection.
+  const provider = deps.registry.get(providerId);
+  if (!provider) {
+    throw new Error(`Unknown provider "${providerId}".`);
+  }
+
+  const compilerInput: ProviderCompilerInput = {
+    spec,
+    provider,
+    strategy,
+    theorySummary: spec.compositionTheory,
+  };
+
+  // Stage D: Gemini (or Mock) structured compiler.
+  let pkg = await deps.compiler.compile(compilerInput);
+
+  // Stage E: deterministic validation.
+  let validation = validatePackage(spec, provider, pkg);
+  let repaired = false;
+
+  if (!validation.ok) {
+    // Stage G: single automatic repair pass (ADR-010), only reached on a blocking error.
+    pkg = await deps.compiler.repair({
+      originalInput: compilerInput,
+      invalidOutput: pkg,
+      validationErrors: validation.errors,
+    });
+    repaired = true;
+
+    validation = validatePackage(spec, provider, pkg);
+    if (!validation.ok) {
+      throw new Error(
+        `Prompt package still fails validation after the single repair pass: ${validation.errors.join("; ")}`,
+      );
+    }
+  }
+
+  // Stage F: independent evaluator (separate schema/instruction from the compiler — ADR-009).
+  const quality = await deps.evaluator.evaluate({ spec, package: pkg });
+  const finalPackage: MusicAIPromptPackage = { ...pkg, promptQuality: quality };
+
+  // Stage H: final package assembly.
+  return { package: MusicAIPromptPackageSchema.parse(finalPackage), repaired };
+}
+
+/** Compiles Safe, Balanced, and Bold in parallel for one provider (PRODUCT_SPEC.md §11). */
+export async function compileAllStrategies(
+  spec: SongDesignSpec,
+  providerId: string,
+  deps: CompilePipelineDeps,
+): Promise<Record<Strategy, CompilePipelineResult>> {
+  const [safe, balanced, bold] = await Promise.all([
+    compilePromptPackage(spec, providerId, "safe", deps),
+    compilePromptPackage(spec, providerId, "balanced", deps),
+    compilePromptPackage(spec, providerId, "bold", deps),
+  ]);
+  return { safe, balanced, bold };
+}

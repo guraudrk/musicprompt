@@ -1,0 +1,79 @@
+프로젝트 루트의 `CLAUDE.md`를 먼저 읽어라.
+
+그다음 아래 파일을 순서대로 읽어라.
+
+1. `docs/PRODUCT_SPEC.md`
+2. `docs/METHODOLOGY.md`
+3. `IMPLEMENTATION_PLAN.md`
+4. `DECISIONS.md`
+5. `knowledge/composition_theory/top_music_school_general_composition.txt`
+6. `knowledge/lyrics/user_lyrics_knowhow.txt`
+
+지금은 Plan Mode로 작업하라. 아직 제품 전체를 구현하지 마라.
+
+먼저 다음을 수행하라.
+
+1. 현재 저장소 구조와 설치된 패키지를 확인한다.
+2. 요구사항을 MVP, Phase 2, Phase 3 이후로 분리한다.
+3. 중복되거나 충돌하는 요구사항을 찾고 해결안을 제시한다.
+4. 다음 핵심 흐름을 기준으로 시스템 아키텍처를 설계한다.
+
+   사용자 입력
+   → SongDesignSpec
+   → 작곡·작사 이론 적용
+   → Provider Capability 확인
+   → Gemini Structured Compiler
+   → 규칙 기반 검증
+   → 독립 Evaluator
+   → Safe / Balanced / Bold 출력
+
+5. 다음 산출물을 작성하거나 갱신한다.
+
+   - `IMPLEMENTATION_PLAN.md`
+   - `DECISIONS.md`
+   - Mermaid 시스템 다이어그램
+   - ERD 초안
+   - 핵심 TypeScript 타입과 Zod 스키마 설계
+   - Provider Registry 인터페이스
+   - LLM Provider 인터페이스
+   - Gemini Compiler 인터페이스
+   - Prompt Evaluator 인터페이스
+   - 테스트 전략
+
+6. Gemini 구현은 다음 원칙을 지켜라.
+
+   - API 키는 `GEMINI_API_KEY` 환경변수에서 서버 측으로만 읽는다.
+   - 브라우저 번들에 키를 포함하지 않는다.
+   - 현재 공식 Google GenAI SDK와 API 문서를 먼저 확인한다.
+   - 구조화 출력과 Zod 검증을 사용한다.
+   - 이론 엔진이 만든 구조 데이터를 Gemini에 전달한다.
+   - Gemini는 최종 문장 정리와 Provider별 Prompt Package 생성을 담당한다.
+   - 생성 후 규칙 기반 검증과 별도 평가를 거친다.
+   - 스키마 또는 차단 오류가 있을 때만 자동 수정 1회를 허용한다.
+   - 사용자의 원문 가사와 잠긴 필드를 보존한다.
+
+7. 첫 구현 범위는 다음으로 제한한다.
+
+   - Next.js + TypeScript 저장소 초기화
+   - 기본 레이아웃과 디자인 토큰
+   - 프로젝트 CRUD의 도메인 모델
+   - `SongDesignSpec` Zod 스키마
+   - Generic / Suno / Udio Provider Profile
+   - Mock LLM Provider
+   - Gemini Provider의 인터페이스와 서버 전용 골격
+   - Safe / Balanced / Bold 컴파일 파이프라인의 Mock 버전
+   - 단위 테스트
+   - `.env.example`
+   - 비밀정보가 제외된 `.gitignore`
+
+8. 다음은 아직 구현하지 마라.
+
+   - 실제 음악 AI 자동 생성
+   - 비공식 API 또는 스크래핑
+   - 결제
+   - 협업
+   - 오디오 분석
+   - 모바일 스토어 빌드
+   - 무거운 3D 효과
+
+계획과 위험요소를 먼저 보고하고, 내가 승인하기 전에는 대규모 구현을 시작하지 마라.
