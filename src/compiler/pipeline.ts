@@ -3,6 +3,7 @@ import type { ProviderCapabilityProfile } from "@/domain/providerCapability/sche
 import type { ProviderRegistry } from "@/providers/registry";
 import type { PromptCompiler, PromptEvaluator, ProviderCompilerInput, CompilerMetadata } from "./types";
 import { MusicAIPromptPackageSchema, SCHEMA_VERSION, type MusicAIPromptPackage, type Strategy } from "@/domain/promptPackage/schema";
+import { runTheoryEngines } from "@/theory/runTheoryEngines";
 
 export type CompilePipelineDeps = {
   registry: ProviderRegistry;
@@ -52,9 +53,9 @@ const FALLBACK_METADATA: CompilerMetadata = { model: "unknown", apiMode: "unknow
 
 /**
  * Orchestrates PRODUCT_SPEC.md §9.2 Stage C through H for one provider + strategy. Stage A
- * (normalization) is assumed to have already produced `spec`. Stage B (theory enrichment) is a
- * pass-through stub in this slice: `spec.compositionTheory` is used as-is, since the real engines
- * are Phase 4 (see IMPLEMENTATION_PLAN.md).
+ * (normalization) is assumed to have already produced `spec`. Stage B (theory enrichment) runs the
+ * 7 deterministic theory engines (Phase 4, src/theory/) — dismissed warnings are filtered and
+ * locked notes fields are preserved before the result ever reaches the compiler.
  */
 export async function compilePromptPackage(
   spec: SongDesignSpec,
@@ -68,11 +69,14 @@ export async function compilePromptPackage(
     throw new Error(`Unknown provider "${providerId}".`);
   }
 
+  // Stage B: theory enrichment.
+  const theorySummary = runTheoryEngines(spec);
+
   const compilerInput: ProviderCompilerInput = {
     spec,
     provider,
     strategy,
-    theorySummary: spec.compositionTheory,
+    theorySummary,
   };
 
   const startedAt = Date.now();

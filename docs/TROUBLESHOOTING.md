@@ -217,3 +217,20 @@ rows during live verification, not by unit tests — the mocked-fallback unit te
 matched. General lesson: when a wrapper exposes metadata about "which implementation actually ran,"
 test the metadata after both the success path and the fallback path, not just the return value.
 
+---
+
+## Phase 4 (theory engines)
+
+No environment/tooling issues or app bugs this phase — typecheck, lint, 99 unit tests, build, and
+the full live walkthrough (analyze → dismiss → re-analyze → lock → re-analyze → compile) all
+passed on the first attempt. Worth noting anyway: this is what it looks like when the *pattern*
+from Phases 0-3 (design the smallest coherent slice, then actually run it against the real
+database/dev server before calling it done) works as intended — not every phase needs to surface a
+bug to be worth live-verifying.
+
+One cosmetic-only observation, not a bug: a diagnostic curl/node script used during verification
+displayed a hand-typed em dash ("—") as "?" in one terminal printout. This was the verification
+script's own terminal encoding, not the application — the actual persisted database value was
+unaffected (confirmed by the lock test passing: the exact hand-written text was preserved and
+returned correctly through the JSON API on re-analyze).
+

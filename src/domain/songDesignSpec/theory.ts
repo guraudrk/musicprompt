@@ -1,9 +1,9 @@
 import { z } from "zod";
 
 /**
- * These seven engines are named in docs/PRODUCT_SPEC.md §6.1. Real rule logic is Phase 4
- * (see IMPLEMENTATION_PLAN.md); this slice only defines the shape their output takes so the
- * compiler pipeline has a stable Stage B contract to stub against.
+ * These seven engines are named in docs/PRODUCT_SPEC.md §6.1 and implemented in src/theory/
+ * (Phase 4, IMPLEMENTATION_PLAN.md). They are deterministic rule checks over the structured text
+ * already in SongDesignSpec, not audio/MIDI analysis.
  */
 export const TheoryEngineNameSchema = z.enum([
   "FormFunctionEngine",
@@ -34,5 +34,7 @@ export const CompositionTheorySpecSchema = z.object({
   arrangementNotes: z.string().optional(),
   subtractionNotes: z.string().optional(),
   engineWarnings: z.array(TheoryWarningSchema),
+  /** Keys ("${engine}:${message}") the user has dismissed — filtered out of future engine runs. */
+  dismissedWarnings: z.array(z.string()).default([]),
 });
 export type CompositionTheorySpec = z.infer<typeof CompositionTheorySpecSchema>;

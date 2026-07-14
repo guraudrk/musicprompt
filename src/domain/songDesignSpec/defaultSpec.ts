@@ -38,7 +38,7 @@ export function buildDefaultSpec(projectId: string): SongDesignSpec {
     contrastPlan: [],
     hookPlan: { candidates: [] },
     repetitionPlan: { exactRepeats: [], surfaceVariations: [], meaningShifts: [] },
-    compositionTheory: { engineWarnings: [] },
+    compositionTheory: { engineWarnings: [], dismissedWarnings: [] },
 
     lyricsDesign: {
       mode: "direct",

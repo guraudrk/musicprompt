@@ -292,28 +292,38 @@ Persisted on `PromptPackage` (new columns, migration `20260714063919_add_compile
 
 ## Phase 4 — Theory engines
 
-Status: `TODO`
+Status: `DONE` (first-slice scope, live-verified)
 
-Implement incrementally:
+1. [x] `FormFunctionEngine` (`src/theory/formFunctionEngine.ts`)
+2. [x] `ProsodyEngine` (`src/theory/prosodyEngine.ts`)
+3. [x] `ArrangementFormEngine` (`src/theory/arrangementFormEngine.ts`)
+4. [x] `MelodyMemoryEngine` (`src/theory/melodyMemoryEngine.ts`)
+5. [x] `RhythmMomentumEngine` (`src/theory/rhythmMomentumEngine.ts`)
+6. [x] `HarmonyGravityEngine` (`src/theory/harmonyGravityEngine.ts`)
+7. [x] `SubtractionEngine` (`src/theory/subtractionEngine.ts`)
 
-1. `FormFunctionEngine`
-2. `ProsodyEngine`
-3. `ArrangementFormEngine`
-4. `MelodyMemoryEngine`
-5. `RhythmMomentumEngine`
-6. `HarmonyGravityEngine`
-7. `SubtractionEngine`
+All 7 are pure, deterministic functions over `SongDesignSpec`'s already-declared text/metadata
+(section names, energy levels, trait lists, plan arrays) — explainable warnings and suggestions,
+not audio/MIDI analysis, per this phase's own instruction. See `docs/PRODUCT_SPEC.md` §6.2 →
+engine mapping and field ownership recorded in `docs/PHASE_LOG.md`'s Phase 4 entry.
 
-Start with explainable warnings and suggestions.
-
-Do not pretend to perform exact audio analysis without audio.
+`runTheoryEngines()` (`src/theory/runTheoryEngines.ts`) combines all 7 and is wired into
+`compiler/pipeline.ts` Stage B, replacing the pass-through stub from Phase 1.
 
 ### Definition of done
 
-- Each engine has deterministic fixtures.
-- Each suggestion includes a reason.
-- Users can reject or lock suggestions.
-- Gemini receives only selected or confirmed results.
+- [x] Each engine has deterministic fixtures. — one test file per engine
+  (`tests/unit/theory/*.test.ts`), built on `buildValidSpec()` with targeted overrides.
+- [x] Each suggestion includes a reason. — every `TheoryWarning` has a `message`, most also have a
+  `suggestion`; all severities are `"info"`/`"warning"` (never `"blocking"` — these are creative
+  advisories, not compile-time validation, which stays Stage E's job).
+- [x] Users can reject or lock suggestions. — reject: `compositionTheory.dismissedWarnings` (ADR-031);
+  lock: existing `SongDesignSpec.lockedFields` mechanism (ADR-031). Both live-verified via
+  `POST /api/projects/{id}/analyze` + the existing `PATCH` (dismissed a real warning, confirmed it
+  stayed filtered on re-analyze; locked `formNotes`, confirmed re-analyze didn't overwrite it).
+- [x] Gemini receives only selected or confirmed results. — Stage B's `theorySummary` is
+  `runTheoryEngines(spec)`, which already excludes dismissed warnings before `ProviderCompilerInput`
+  is built.
 
 ---
 
@@ -488,7 +498,13 @@ Each requires official capability verification and tests.
    producing genuinely distinct Safe/Balanced/Bold creative output with locked lyrics preserved.
    See `docs/PHASE_LOG.md` and `docs/TROUBLESHOOTING.md` for exact timings and a real correctness
    bug (dev-fallback metadata mislabeling) caught and fixed during live testing.
-5. **Next actual work**: the Phase 2-tail UI (reference/deliberate-differences,
-   structure/emotion-curve editing, full 8-screen wizard) or Phase 4 (theory engines). A budget-
-   limit policy decision is now pending before Gemini usage caps can be implemented
+5. ~~Complete Phase 4 (theory engines) and live-verify it.~~ Done — all 7 engines
+   (`src/theory/`) wired into Stage B, reject via `dismissedWarnings` and lock via the existing
+   `lockedFields` mechanism (ADR-031/032), 99 unit tests (up from 52), and a live walkthrough:
+   analyzed a real project (6 real warnings), dismissed one and confirmed it stayed filtered,
+   locked a notes field and confirmed re-analyze didn't overwrite it, then confirmed compile still
+   works end-to-end with the real theory summary feeding Stage D.
+6. **Next actual work**: the Phase 2-tail UI (reference/deliberate-differences,
+   structure/emotion-curve editing, full 8-screen wizard) or Phase 5 (advanced lyrics). A budget-
+   limit policy decision is still pending before Gemini usage caps can be implemented
    (see `DECISIONS.md`).

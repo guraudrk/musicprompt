@@ -5,6 +5,7 @@ import type { Project } from "@/domain/project/schema";
 import type { SongDesignSpec } from "@/domain/songDesignSpec/schema";
 import type { LyricsMode } from "@/domain/songDesignSpec/lyrics";
 import type { MusicAIPromptPackage } from "@/domain/promptPackage/schema";
+import type { CompositionTheorySpec } from "@/domain/songDesignSpec/theory";
 
 const LYRICS_MODES: LyricsMode[] = [
   "simple_direct",
@@ -59,6 +60,10 @@ export function ProjectEditor({ project }: { project: Project }) {
   const [compileError, setCompileError] = useState<string | null>(null);
   const [results, setResults] = useState<CompareResult | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const [theory, setTheory] = useState<CompositionTheorySpec | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
   function buildSpecFromForm(base: SongDesignSpec): SongDesignSpec {
     return {
@@ -122,6 +127,44 @@ export function ProjectEditor({ project }: { project: Project }) {
       return;
     }
     setResults(await response.json());
+  }
+
+  async function handleAnalyze() {
+    setAnalyzing(true);
+    setAnalyzeError(null);
+
+    const response = await fetch(`/api/projects/${project.id}/analyze`, { method: "POST" });
+
+    setAnalyzing(false);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: "Analyze failed." }));
+      setAnalyzeError(body.error ?? "Analyze failed.");
+      return;
+    }
+    const { compositionTheory } = await response.json();
+    setTheory(compositionTheory);
+  }
+
+  async function handleDismiss(engine: string, message: string) {
+    const key = `${engine}:${message}`;
+    const updatedSpec: SongDesignSpec = {
+      ...buildSpecFromForm(current.spec),
+      compositionTheory: {
+        ...current.spec.compositionTheory,
+        dismissedWarnings: [...current.spec.compositionTheory.dismissedWarnings, key],
+      },
+    };
+
+    const response = await fetch(`/api/projects/${project.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updatedSpec),
+    });
+    if (!response.ok) return;
+
+    const { project: updated } = await response.json();
+    setCurrent(updated);
+    await handleAnalyze();
   }
 
   async function copyToClipboard(key: string, text: string) {
@@ -245,12 +288,45 @@ export function ProjectEditor({ project }: { project: Project }) {
         <button onClick={handleCompile} disabled={compiling}>
           {compiling ? "Compiling..." : "Compile (Safe / Balanced / Bold)"}
         </button>
+        <button onClick={handleAnalyze} disabled={analyzing}>
+          {analyzing ? "Analyzing..." : "Analyze (theory check)"}
+        </button>
         <a href={`/api/projects/${project.id}/export/txt`}>Export TXT</a>
         <a href={`/api/projects/${project.id}/export/json`}>Export JSON</a>
       </div>
 
       {saveError && <p role="alert" style={{ color: "var(--color-warning)" }}>{saveError}</p>}
       {compileError && <p role="alert" style={{ color: "var(--color-warning)" }}>{compileError}</p>}
+      {analyzeError && <p role="alert" style={{ color: "var(--color-warning)" }}>{analyzeError}</p>}
+
+      {theory && (
+        <section>
+          <h2>Theory check</h2>
+          {theory.engineWarnings.length === 0 ? (
+            <p>No open suggestions.</p>
+          ) : (
+            <ul>
+              {theory.engineWarnings.map((w, i) => (
+                <li key={`${w.engine}:${w.message}:${i}`} style={{ marginBottom: "0.5rem" }}>
+                  <strong>
+                    [{w.severity}] {w.engine}:
+                  </strong>{" "}
+                  {w.message}
+                  {w.suggestion && (
+                    <>
+                      {" — "}
+                      <em>{w.suggestion}</em>
+                    </>
+                  )}
+                  <button onClick={() => handleDismiss(w.engine, w.message)} style={{ marginLeft: "0.5rem" }}>
+                    Dismiss
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       {results && (
         <section>

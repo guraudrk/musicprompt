@@ -268,3 +268,82 @@ See `DECISIONS.md` ADR-028 through ADR-030.
 - App-level rate limiting (distinct from the single-Gemini-429 handling this phase adds) — still
   pending, unchanged from Phase 0-2.
 - DB hosting, deployment platform, background jobs — still pending.
+
+---
+
+## Phase 4 — Theory engines (first slice)
+
+- Date: 2026-07-14
+- Status: **DONE, live-verified**
+
+### 한글 요약
+
+- **무엇을 만들었나**: `docs/PRODUCT_SPEC.md` §6.1에 명시된 7개 작곡 이론 엔진(FormFunction, MelodyMemory,
+  HarmonyGravity, RhythmMomentum, Prosody, ArrangementForm, Subtraction)을 전부 결정론적(deterministic)
+  순수 함수로 구현했습니다. 오디오/MIDI 분석이 아니라 `SongDesignSpec`에 이미 있는 구조화된 텍스트/메타데이터
+  (섹션 이름, 에너지 레벨, 특성 목록 등)를 검사하는 방식입니다. 컴파일 파이프라인의 Stage B(이론 보강)가
+  이제 이 엔진들을 실제로 실행하며, 기존의 "그대로 통과" 스텁을 대체합니다.
+- **거부(reject)와 잠금(lock)**: 새로운 저장 개념을 만들지 않고 기존 메커니즘을 재사용했습니다 — 경고
+  거부는 `compositionTheory.dismissedWarnings` 배열(기존 `songDesignSpec` JSON 안에 위치, 새 DB
+  마이그레이션 불필요), 필드 잠금은 이미 Phase 1부터 있던 `lockedFields`를 그대로 씁니다. 읽기 전용
+  `POST /api/projects/{id}/analyze` 엔드포인트가 새로 생겼고, 실제 저장은 기존 PATCH가 그대로 담당합니다.
+- **검증**: 엔진 7개 + 오케스트레이터에 대한 유닛 테스트를 새로 작성(총 99개, 이전 52개에서 증가), 그리고
+  실제 실행 중인 프로젝트로 라이브 검증까지 진행했습니다 — 실제 프로젝트를 분석해서 진짜 경고 6개를 확인,
+  그중 하나를 거부한 뒤 재분석해도 계속 필터링되는 것을 확인, `formNotes` 필드를 잠근 뒤 재분석해도
+  덮어써지지 않는 것을 확인, 그리고 이론 엔진이 추가된 뒤에도 컴파일이 여전히 정상 작동하는 것(Mock 폴백
+  포함, Phase 3의 메타데이터 정확성 수정도 그대로 잘 작동)까지 확인했습니다.
+- **남은 것**: 노트 필드(예: formNotes)를 사용자가 직접 타이핑해서 편집하는 UI는 아직 없습니다(엔진이 계산한
+  값을 보여주고 거부/잠금만 가능). 제안을 실제 스펙 수정으로 자동 반영하는 기능은 Phase 6(Revision Lab)의
+  역할로 남겨뒀습니다.
+
+### What shipped
+
+- All 7 engines as pure, deterministic functions (`src/theory/*.ts`) grounded in
+  `docs/METHODOLOGY.md` / `knowledge/composition_theory/...txt` — see the required-check → engine
+  mapping in the approved plan (now also reflected in `DECISIONS.md` ADR-031/032).
+- `runTheoryEngines()` (`src/theory/runTheoryEngines.ts`) combines all 7, filters dismissed
+  warnings, preserves locked notes fields, and combines multiple engines' contributions to a
+  shared notes field (e.g. `tensionReleaseNotes` from both Harmony and Rhythm engines).
+- `compiler/pipeline.ts` Stage B now calls `runTheoryEngines(spec)` instead of passing
+  `spec.compositionTheory` through unchanged.
+- `CompositionTheorySpec.dismissedWarnings: string[]` (new field, no DB migration — lives inside
+  the existing `songDesignSpec` jsonb column).
+- New read-only `POST /api/projects/{id}/analyze` endpoint.
+- `ProjectEditor.tsx`: "Analyze (theory check)" button, warnings grouped with severity and a
+  per-warning "Dismiss" button that saves via the existing PATCH.
+- 47 new unit tests (99 total, up from 52): one file per engine, an orchestrator test (dismiss
+  filtering, lock preservation, shared-field combination), and an analyze-route ownership test.
+
+### Live verification
+
+Against the already-running Docker Postgres and dev server (same project used in Phase 2/3):
+
+- `POST /analyze` on the real project returned 6 genuine warnings (e.g. "No harmonic traits
+  declared," "Only one hook candidate has been recorded").
+- Dismissed one via a PATCH (`dismissedWarnings: ["HarmonyGravityEngine:No harmonic traits declared."]`);
+  re-analyze returned 5 warnings and confirmed the dismissed one stayed filtered.
+- Locked `compositionTheory.formNotes` with hand-written text via `lockedFields`; re-analyze
+  confirmed the text was untouched (engines still ran, just didn't overwrite that one field).
+- Ran a real compile afterward to confirm Stage B's change didn't break the pipeline — it
+  completed successfully (fell back to Mock on this particular call, same variability seen in
+  Phase 3's bold strategy; the persisted metadata correctly said `model: mock`, confirming the
+  Phase 3 metadata-correctness fix still holds).
+
+### Verification at time of this entry
+
+- `pnpm typecheck`, `pnpm lint` — pass
+- `pnpm test` — 99/99 pass
+- `pnpm build` — pass, new `/api/projects/[projectId]/analyze` route compiled
+- Live walkthrough — pass (see above)
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-031 and ADR-032.
+
+### Known gaps carried forward
+
+- Manual editing of the 8 `compositionTheory.*Notes` text fields — not exposed in the UI this
+  slice; engines always regenerate them fresh unless locked.
+- Turning an accepted suggestion into an automatic spec edit — deferred to Phase 6 (Revision Lab).
+- Everything already pending from Phase 0-3 (DB hosting, deployment platform, budget-limit policy,
+  logging/observability, app-level rate limiting, background jobs) is still pending.

@@ -17,14 +17,16 @@
 
 ## 현재 상태
 
-**Phase 0–3 완료, 실제 Postgres와 실제 Gemini 호출로 라이브 검증까지 마침.** `SongDesignSpec` Zod 스키마,
-Generic/Suno/Udio Provider Registry, Auth.js 이메일/비밀번호 인증, Prisma/Postgres 영속성, 프로젝트
-CRUD·컴파일·내보내기 API, 단일 페이지 프로젝트 편집기, 그리고 `@google/genai`(Interactions API)를 통한
-실제 Gemini 구조화 출력 컴파일러가 구현되어 있습니다 (개발 환경에서는 실패 시 Mock으로 자동 폴백, 프로덕션은
-실제 에러를 그대로 노출). 회원가입→프로젝트 생성→저장→컴파일→내보내기, 다른 사용자 접근 차단, Playwright
-happy-path, 그리고 실제 Gemini API 호출로 Safe/Balanced/Bold를 컴파일하고 잠금 가사가 그대로 보존되는 것까지
-전부 실제로 실행해 확인했습니다 (`docs/PHASE_LOG.md` Phase 2/3 "Live verification" 참고). 전체 8단계 위저드
-UI·PWA/모바일은 아직 없습니다 (Phase 2 후반·Phase 4+ 예정).
+**Phase 0–4 완료, 전부 라이브 검증까지 마침.** `SongDesignSpec` Zod 스키마, Generic/Suno/Udio Provider
+Registry, Auth.js 이메일/비밀번호 인증, Prisma/Postgres 영속성, 프로젝트 CRUD·컴파일·내보내기 API, 단일
+페이지 프로젝트 편집기, `@google/genai`(Interactions API)를 통한 실제 Gemini 구조화 출력 컴파일러(개발
+환경에서는 실패 시 Mock으로 자동 폴백), 그리고 7개 작곡 이론 엔진(FormFunction/MelodyMemory/HarmonyGravity/
+RhythmMomentum/Prosody/ArrangementForm/Subtraction)이 구현되어 있습니다 — 이론 엔진이 만든 제안은 프로젝트
+페이지의 "Analyze" 버튼으로 확인하고, 개별 제안을 거부(dismiss)하거나 특정 항목을 잠글(lock) 수 있습니다.
+회원가입→프로젝트 생성→저장→컴파일→내보내기, 다른 사용자 접근 차단, Playwright happy-path, 실제 Gemini API
+호출로 Safe/Balanced/Bold 컴파일, 그리고 이론 엔진 분석→제안 거부→재분석까지 전부 실제로 실행해 확인했습니다
+(`docs/PHASE_LOG.md` Phase 2/3/4 "Live verification" 참고). 전체 8단계 위저드 UI·PWA/모바일은 아직 없습니다
+(Phase 2 후반·Phase 5+ 예정).
 
 상세는 [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md), [`docs/PHASE_LOG.md`](docs/PHASE_LOG.md),
 [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) 참고.

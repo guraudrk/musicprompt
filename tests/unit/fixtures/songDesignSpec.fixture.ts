@@ -78,6 +78,7 @@ export function buildValidSpec(overrides: Partial<SongDesignSpec> = {}): SongDes
 
     compositionTheory: {
       engineWarnings: [],
+      dismissedWarnings: [],
     },
 
     lyricsDesign: {
