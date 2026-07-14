@@ -400,33 +400,49 @@ Status: `TODO`
 
 ## Phase 7 — Visual system and landing page
 
-Status: `TODO`
+Status: `IN PROGRESS` (first slice done, live-verified — see below)
 
 ### Features
 
-- Dark immersive hero
-- Original Sound Seed Orb
-- Live transformation demo
-- Methodology story
-- Provider selector
-- Composition/Lyrics Lab preview
-- App section
-- Final CTA
+- [x] Dark immersive hero — `src/app/page.tsx`/`page.module.css`, full-viewport section, dark
+  gradient background (not tied to the light/dark theme toggle, matching this feature's intent),
+  centered headline + description.
+- [ ] Original Sound Seed Orb — not built yet; the hero currently uses a plain CSS gradient
+  background as a placeholder.
+- [ ] Live transformation demo — not built yet; the scroll-reveal section currently shows a static
+  mocked prompt-package-preview card (stylized JSON), not a real animated demo.
+- [ ] Methodology story
+- [ ] Provider selector
+- [ ] Composition/Lyrics Lab preview
+- [ ] App section
+- [x] Final CTA — fixed pill-shaped Sign up / Log in button bar with a fading scroll-hint chevron
+  (`src/app/ScrollHint.tsx`).
 
 ### Guardrails
 
-- No copied NYPC assets
-- No copied exact layout
-- Reduced motion
-- Mobile fallback
-- Performance budget
+- [x] No copied NYPC assets — no video/image/font/copy of theirs was reused; see ADR-035.
+- [x] ~~No copied exact layout~~ — **overridden for this slice only**, by explicit user
+  instruction, after being shown this guardrail. Layout/measurements were closely modeled on
+  nypc.co.kr's teaser page; brand assets/copy/licensed font were not. See ADR-035. This override
+  does not apply to the remaining Phase 7 items (Orb, live demo, methodology story, etc.), which
+  are still free to diverge from NYPC as originally planned.
+- [x] Reduced motion — the scroll-hint bounce animation inherits the existing global
+  `prefers-reduced-motion` rule in `globals.css`; live-verified via Playwright
+  (`tests/e2e/landing.spec.ts`).
+- [x] Mobile fallback — responsive breakpoints at 1261/1024/640px; live-verified via screenshot at
+  375px width with no horizontal overflow.
+- [ ] Performance budget — not measured yet (no Lighthouse run this slice).
 
 ### Definition of done
 
-- Responsive screenshots reviewed.
-- Keyboard navigation works.
-- Lighthouse or equivalent baseline recorded.
-- Heavy visual effects are lazy-loaded.
+- [x] Responsive screenshots reviewed. — desktop hero, desktop scroll-reveal section, and 375px
+  mobile width all screenshotted and reviewed during live verification (caught and fixed a real
+  layout bug — see Troubleshooting).
+- [ ] Keyboard navigation works. — not explicitly checked yet (Sign up/Log in are plain `<Link>`s,
+  so likely fine, but not verified this slice).
+- [ ] Lighthouse or equivalent baseline recorded. — not done yet.
+- [x] Heavy visual effects are lazy-loaded. — N/A for this slice; no heavy effects exist yet (Orb,
+  live demo).
 
 ---
 
@@ -537,7 +553,14 @@ Each requires official capability verification and tests.
    against real structure data runs cleanly. Caught and fixed a real bug: the save-error banner
    only ever showed the generic `"Invalid song design spec."` message, silently dropping the
    specific Zod issue text the API already returned — see `docs/TROUBLESHOOTING.md`.
-8. **Next actual work**: the full 8/14-screen wizard (PRODUCT_SPEC §16) remains out of scope for
-   now; other candidates are Phase 6 (Revision Lab), `contrastPlan`/`hookPlan`/`repetitionPlan` UI,
-   or the lock-field UI for `compositionTheory.*Notes` (deferred since Phase 4). A budget-limit
-   policy decision is still pending before Gemini usage caps can be implemented (see `DECISIONS.md`).
+8. ~~Complete the Phase 7 first slice (dark immersive hero + scroll-reveal section + final CTA,
+   structurally modeled on nypc.co.kr per explicit user instruction) and live-verify it.~~ Done —
+   ADR-035. `src/app/page.tsx`/`page.module.css`/`ScrollHint.tsx`; live-verified via screenshots
+   (caught and fixed a real layout bug: the fixed CTA bar overlapped the last description item),
+   mobile-width overflow check, reduced-motion check, and a new `tests/e2e/landing.spec.ts`.
+9. **Next actual work**: the rest of Phase 7 (Sound Seed Orb, live transformation demo,
+   methodology story, provider selector, Lab preview, app section, Lighthouse baseline) remains
+   open; other candidates are Phase 6 (Revision Lab), the full 8/14-screen wizard (PRODUCT_SPEC
+   §16), `contrastPlan`/`hookPlan`/`repetitionPlan` UI, or the lock-field UI for
+   `compositionTheory.*Notes` (deferred since Phase 4). A budget-limit policy decision is still
+   pending before Gemini usage caps can be implemented (see `DECISIONS.md`).

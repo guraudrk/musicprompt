@@ -542,3 +542,85 @@ See `DECISIONS.md` ADR-034.
   slice; not fixed here (see Troubleshooting for what was and wasn't addressed).
 - Everything already pending from Phase 0-5 (DB hosting, deployment platform, budget-limit policy,
   logging/observability, app-level rate limiting, background jobs) is still pending.
+
+---
+
+## Phase 7 (first slice) — Dark immersive hero + scroll-reveal section + final CTA
+
+- Date: 2026-07-14
+- Status: **DONE (first-slice scope), live-verified**
+
+### 한글 요약
+
+- **무엇을 만들었나**: 그동안 자리만 잡아두었던 메인 페이지(`/`)에 실제 랜딩 페이지를 만들었습니다.
+  사용자가 https://www.nypc.co.kr/main/main.do 를 보여주며 "이 페이지와 똑같은 구조로, 스크롤하면
+  설명이 나오는 것까지" 만들어달라고 요청했는데, `IMPLEMENTATION_PLAN.md` Phase 7에는 이미 NYPC를
+  참고 후보로 언급하면서 "에셋 그대로 복사 금지 / 레이아웃 그대로 복사 금지"라는 가드레일이 있었습니다.
+  조용히 무시하지 않고 사용자에게 이 충돌을 알린 뒤, "레이아웃/구조는 최대한 동일하게" 하기로 명시적
+  확인을 받고 진행했습니다(ADR-035에 예외로 기록). 실제 NYPC 페이지와 CSS 파일들을 직접 받아서 분석한
+  결과, 실제 구조는 카드 그리드가 아니라 "검은 배경, 전체 화면 2개 섹션, 하단 고정 CTA 버튼 + 스크롤
+  힌트 화살표"로 이루어진 티저 페이지였습니다. 이 구조(비율, 폰트 크기, 여백, 인터랙션 방식)는 최대한
+  그대로 옮겼지만, NYPC의 실제 브랜드명/카피/영상·이미지 에셋/유료 라이선스 폰트(poster-gothic-cond-atf,
+  Adobe Typekit 유료 폰트)는 전혀 재사용하지 않았습니다 — 색상은 프로젝트 기존 다크 테마 토큰을, 카피는
+  Music Prompt Architect의 실제 제품 내용(Safe/Balanced/Bold, 7개 이론 엔진)을 그대로 사용했습니다.
+- **실제 버그 발견 및 수정**: 스크린샷으로 확인하던 중, 하단에 고정된 CTA 버튼 바가 두 번째 섹션의
+  마지막 설명 항목 텍스트를 가리는 것을 발견했습니다 — 알고 보니 NYPC의 실제 CSS에도 정확히 이 문제를
+  피하기 위한 `padding-bottom: 160px`이 있었는데, 이 부분을 포팅하면서 빠뜨렸던 것이었습니다. 동일한
+  하단 여백을 추가해서 수정하고 스크린샷으로 재확인했습니다.
+- **검증**: 스크린샷 3장(히어로, 스크롤 후 설명 섹션, 모바일 375px 너비)으로 실제 레이아웃을 눈으로
+  확인했고, `prefers-reduced-motion`이 스크롤 힌트 애니메이션을 실제로 멈추는지, 모바일 너비에서 가로
+  스크롤이 생기지 않는지, Sign up/Log in 버튼이 실제로 `/signup`/`/login`으로 이동하는지까지 새
+  Playwright 스펙(`tests/e2e/landing.spec.ts`)으로 자동화했습니다.
+- **남은 것**: Phase 7의 나머지 항목(Sound Seed Orb, 실시간 변환 데모, 방법론 스토리, Provider 선택기,
+  Composition/Lyrics Lab 미리보기, App 섹션, Lighthouse 측정)은 이번 슬라이스에 포함되지 않았습니다.
+  이번에 받은 "레이아웃 그대로" 예외는 이번 슬라이스에만 적용되며, 나머지 Phase 7 항목은 원래 계획대로
+  NYPC와 다르게 만들 수 있습니다.
+
+### What shipped
+
+- `src/app/page.tsx` — rewritten as a two-section landing page (dark full-viewport hero with
+  centered headline/description; a second full-viewport section with a static mocked
+  prompt-package-preview card + a divided two-item description list).
+- `src/app/page.module.css` — new layout matching the measured structural values from NYPC's
+  `teaser.css` (hero `dt`-equivalent 42px/700 desktop → ~28px mobile, section-2 heading 20px with
+  a divider before the second item, 48px/24px-radius pill CTA buttons, the same `translateY` bounce
+  keyframe for the scroll hint), using this project's own color tokens/fonts, with responsive
+  breakpoints at 1261/1024/640px.
+- `src/app/ScrollHint.tsx` (new) — small client component toggling a fade-out state once
+  `window.scrollY > 8`, reimplemented fresh (not copied JS) to match the same interaction pattern.
+- New `tests/e2e/landing.spec.ts` — Sign up/Log in navigation, `prefers-reduced-motion` behavior.
+
+### Live verification
+
+Against the already-running dev server:
+
+- Took and reviewed screenshots at desktop width (hero, and after scrolling to the second section)
+  and at 375px mobile width — this is what caught the CTA-bar/description-text overlap bug (fixed,
+  re-screenshotted, confirmed fixed).
+- Confirmed no horizontal overflow at 375px width via `document.documentElement.scrollWidth` vs.
+  `clientWidth`.
+- Confirmed the scroll-hint fades (`data-scrolled="true"`) after scrolling, and that
+  `prefers-reduced-motion: reduce` collapses its animation duration to effectively zero.
+- Confirmed Sign up/Log in links navigate to `/signup`/`/login` correctly.
+
+### Verification at time of this entry
+
+- `pnpm typecheck`, `pnpm lint`, `pnpm build` — pass
+- `pnpm test` — 120/120 pass (unchanged)
+- `pnpm exec playwright test tests/e2e/landing.spec.ts` — pass
+- Full Playwright suite — 3/4 pass; the 1 failure is the pre-existing, already-documented
+  `happy-path.spec.ts` Gemini-latency flake, unrelated to this slice.
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-035 (guardrail override, what was/wasn't reused, the padding-bug fix).
+
+### Known gaps carried forward
+
+- The rest of Phase 7: Sound Seed Orb, live transformation demo, methodology story, provider
+  selector, Composition/Lyrics Lab preview, app section, Lighthouse baseline.
+- Keyboard navigation wasn't explicitly checked this slice (Sign up/Log in are plain `<Link>`s, so
+  likely fine, but not verified).
+- Everything already pending from Phase 0-5 + Phase 2-tail (DB hosting, deployment platform,
+  budget-limit policy, logging/observability, app-level rate limiting, background jobs,
+  `happy-path.spec.ts`'s Gemini-latency flake) is still pending.

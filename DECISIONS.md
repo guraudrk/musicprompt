@@ -667,6 +667,55 @@ though the server had always computed it correctly. Fixed by having `handleSave`
 
 ---
 
+## ADR-035 — Landing page structurally modeled on nypc.co.kr, overriding Phase 7's "no copied exact layout" guardrail
+
+- Status: Accepted
+- Date: 2026-07-14
+
+### Decision
+
+`IMPLEMENTATION_PLAN.md` Phase 7 already named NYPC (nypc.co.kr) as a reference point with an
+explicit guardrail: "No copied NYPC assets / No copied exact layout." The user directly instructed
+overriding the layout half of that guardrail for the Phase 7 first slice — match NYPC's structure
+"as pixel/layout-identical as possible" — after being shown the guardrail and asked to confirm.
+Per CLAUDE.md's rule not to silently resolve a conflict between a user instruction and a
+source-of-truth document, this is recorded here rather than quietly overridden.
+
+What was reused: the concrete layout mechanics found by fetching the live page and its stylesheets
+(specifically `teaser.css`, which is what actually styles the current page — `renewal17.css`/
+`common2.css` turned out to be legacy/unused) — a full-viewport 2-section dark scroll layout, a
+fixed pill-shaped CTA bar with a bouncing/fading scroll-hint chevron, absolute-positioned hero
+content near the bottom of the viewport, and a second section with a media block above a
+divided description list (each subsequent `dt`/`dd` pair gets a top divider + extra margin).
+Measurements (font sizes, gaps, button height/radius, breakpoints) were carried over closely.
+
+What was **not** reused, regardless of the layout override: NYPC's actual brand name/copy, their
+video/image assets, their licensed display font (`poster-gothic-cond-atf`, a paid Adobe Typekit
+font — not something this project has a license for), or their divider image asset. These are
+genuine trademark/licensing boundaries independent of the internal "guardrail," not just a stricter
+reading of it. Colors use this project's own existing dark-theme tokens
+(`--color-accent-primary`/`--color-accent-secondary`, `src/app/globals.css`) instead of NYPC's
+red/blue gradient, and the existing Geist font already wired up in `layout.tsx`. Copy is Music
+Prompt Architect's own real product framing (Safe/Balanced/Bold, the 7 theory engines), not a
+translation of NYPC's.
+
+### Reason
+
+The user made an informed choice after seeing the pre-existing guardrail and its rationale; this
+is a one-time recorded exception for this slice, not a silent repeal of the guardrail for future
+Phase 7 work (Sound Seed Orb, live demo, methodology story, etc. remain free to diverge from NYPC
+as originally planned).
+
+### Consequence (live-verified layout bug found and fixed)
+
+A first screenshot-based check found the fixed CTA bar visually overlapping the last description
+item in the second section — the same reason NYPC's own CSS has
+`.section-contents .teaser-info { padding-bottom: 160px; }`, which had been missed when porting the
+layout over. Fixed by adding equivalent bottom padding to `.detailSection`. See
+`docs/TROUBLESHOOTING.md`.
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:

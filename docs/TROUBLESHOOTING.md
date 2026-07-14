@@ -328,3 +328,38 @@ new 15000ms boundary) — real Gemini API reliability/latency in this environmen
 slice's scope to fix, and is tracked as a known gap rather than resolved here. `tests/e2e/
 reference-structure.spec.ts` does not depend on the compile endpoint and passes reliably.
 
+---
+
+## Phase 7 (first slice — landing page)
+
+### Fixed CTA bar overlapped the scroll-reveal section's last description item
+
+**Symptom:** A first screenshot taken after scrolling to the second section showed the fixed
+Sign up/Log in button bar visually covering the last line of the "Seven theory engines, built in"
+description text.
+
+**Cause:** `.detailSection` had no bottom padding accounting for the fixed `.ctaBar` (which stays
+on screen at `bottom: 3.75rem` regardless of scroll position). This is the exact same reason the
+real NYPC page being modeled has `.section-contents .teaser-info { padding-bottom: 160px; }` in its
+own CSS (`teaser.css`) — a detail present in the source material but missed when porting the
+layout mechanics over by hand.
+
+**Fix:** Added `padding: 4rem 1.5rem 10rem` (bottom padding ≈ the CTA bar's own footprint plus
+breathing room) to `.detailSection` in `src/app/page.module.css`. Re-screenshotted and confirmed
+the divider and both description items are now fully clear of the CTA bar. General lesson: when
+porting a layout pattern that includes a `position: fixed` element, check the *source's* padding
+values too, not just its visible proportions — a fixed element's clearance is often handled by a
+padding rule elsewhere in the stylesheet that's easy to miss when reading the markup alone.
+
+### Playwright `toBe()` exact-string match on `animationDuration` was too strict
+
+**Symptom:** A `prefers-reduced-motion` check asserting
+`getComputedStyle(el).animationDuration === "0.01ms"` failed with `Received: "1e-05s"` — a
+different but numerically identical value (0.01ms = 1e-5s); the global `prefers-reduced-motion`
+rule in `globals.css` (`animation-duration: 0.01ms !important`) was working correctly.
+
+**Fix:** Changed the assertion to `parseFloat(...) < 0.001` instead of comparing the exact string,
+since browsers can normalize computed style value units/formatting. General lesson: when asserting
+on a CSS computed value that represents "effectively zero" or "effectively instant," assert on the
+parsed numeric threshold, not the literal string the browser happens to serialize it as.
+
