@@ -14,6 +14,13 @@
 - Phase 완료 이력: [`docs/PHASE_LOG.md`](docs/PHASE_LOG.md)
 - 기술 이슈·트러블슈팅 기록: [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)
 - Claude Code 작업 지침: [`CLAUDE.md`](CLAUDE.md)
+- 날짜별 개발일지: [`docs/work-log/`](docs/work-log/) (아래 [개발일지](#개발일지) 섹션 참고)
+
+## 개발일지
+
+커밋·푸시 직전에 자동으로 갱신되는 날짜별 개발일지입니다 (`docs/CLAUDE_COMMIT_WORKLOG_INSTRUCTIONS.md` 참고).
+
+- [2026-07-15 개발일지](docs/work-log/2026-07-15.md)
 
 ## 현재 상태
 
