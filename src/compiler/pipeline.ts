@@ -3,9 +3,17 @@ import type { ProviderCapabilityProfile } from "@/domain/providerCapability/sche
 import type { CompositionTheorySpec } from "@/domain/songDesignSpec/theory";
 import type { ProviderRegistry } from "@/providers/registry";
 import type { PromptCompiler, PromptEvaluator, ProviderCompilerInput, CompilerMetadata } from "./types";
-import { MusicAIPromptPackageSchema, SCHEMA_VERSION, type MusicAIPromptPackage, type Strategy } from "@/domain/promptPackage/schema";
+import {
+  MusicAIPromptPackageSchema,
+  CompilerOutputSchema,
+  SCHEMA_VERSION,
+  type CompilerOutput,
+  type MusicAIPromptPackage,
+  type Strategy,
+} from "@/domain/promptPackage/schema";
 import { runTheoryEngines } from "@/theory/runTheoryEngines";
 import { validateTheoryAddressal } from "./validateTheoryAddressal";
+import { assembleFullPackage } from "./deterministicFields";
 
 export type CompilePipelineDeps = {
   registry: ProviderRegistry;
@@ -19,29 +27,35 @@ export type CompilePipelineResult = {
   metadata: CompilerMetadata & { schemaVersion: string; latencyMs: number; repairCount: number };
 };
 
-function validatePackage(
+/**
+ * Stage E: validates the compiler's creative-only output (ADR-050). Deterministic fields
+ * (provider metadata, theoryRationale, warnings, toolInstructions, copyBundle, promptQuality) are
+ * assembled separately in `assembleFullPackage` and never part of what a compiler must produce or
+ * what's validated here.
+ */
+function validateCompilerOutput(
   spec: SongDesignSpec,
   provider: ProviderCapabilityProfile,
   theorySummary: CompositionTheorySpec,
-  pkg: MusicAIPromptPackage,
+  output: CompilerOutput,
 ): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
 
   // Stage E: schema validity.
-  const parsed = MusicAIPromptPackageSchema.safeParse(pkg);
+  const parsed = CompilerOutputSchema.safeParse(output);
   if (!parsed.success) {
     errors.push(...parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`));
   }
 
   // Stage E: locked lyric lines must survive compile (CLAUDE.md §3, PRODUCT_SPEC §9.2 Stage E).
   for (const line of spec.lyricsDesign.lockedLines) {
-    if (!(pkg.fields.lyrics ?? "").includes(line)) {
+    if (!(output.fields.lyrics ?? "").includes(line)) {
       errors.push(`Locked lyric line was not preserved: "${line}"`);
     }
   }
 
   // Stage E: required provider fields must be present.
-  const fields = pkg.fields as Record<string, unknown>;
+  const fields = output.fields as Record<string, unknown>;
   for (const requiredField of provider.promptSchema.requiredFields) {
     const value = fields[requiredField];
     if (value === undefined || value === null || value === "") {
@@ -51,7 +65,7 @@ function validatePackage(
 
   // Stage E: every active theory-engine warning must be genuinely addressed, not silently ignored.
   if (parsed.success) {
-    errors.push(...validateTheoryAddressal(theorySummary, pkg));
+    errors.push(...validateTheoryAddressal(theorySummary, output));
   }
 
   return { ok: errors.length === 0, errors };
@@ -89,29 +103,33 @@ export async function compilePromptPackage(
 
   const startedAt = Date.now();
 
-  // Stage D: Gemini (or Mock) structured compiler.
-  let pkg = await deps.compiler.compile(compilerInput);
+  // Stage D: Gemini (or Mock) structured compiler — creative fields only (ADR-050).
+  let output = await deps.compiler.compile(compilerInput);
 
   // Stage E: deterministic validation.
-  let validation = validatePackage(spec, provider, theorySummary, pkg);
+  let validation = validateCompilerOutput(spec, provider, theorySummary, output);
   let repaired = false;
 
   if (!validation.ok) {
     // Stage G: single automatic repair pass (ADR-010), only reached on a blocking error.
-    pkg = await deps.compiler.repair({
+    output = await deps.compiler.repair({
       originalInput: compilerInput,
-      invalidOutput: pkg,
+      invalidOutput: output,
       validationErrors: validation.errors,
     });
     repaired = true;
 
-    validation = validatePackage(spec, provider, theorySummary, pkg);
+    validation = validateCompilerOutput(spec, provider, theorySummary, output);
     if (!validation.ok) {
       throw new Error(
         `Prompt package still fails validation after the single repair pass: ${validation.errors.join("; ")}`,
       );
     }
   }
+
+  // Assemble the full package (deterministic fields + placeholder quality) before Stage F, since
+  // the evaluator expects a complete MusicAIPromptPackage (e.g. reads `theoryRationale.hook`).
+  const pkg = assembleFullPackage(spec, provider, strategy, theorySummary, output);
 
   // Stage F: independent evaluator (separate schema/instruction from the compiler — ADR-009).
   const quality = await deps.evaluator.evaluate({ spec, package: pkg });

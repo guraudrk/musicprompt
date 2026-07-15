@@ -727,7 +727,29 @@ Each requires official capability verification and tests.
     which succeeded quickly). Worst-case wait capped at 90s instead of 180-360s; a guaranteed speed
     floor for every possible input isn't something a prompt-side fix can promise, and this was
     stated plainly rather than oversold.
-23. **Next actual work**: replacing the in-memory demo rate limiter with a shared store (Vercel
+23. ~~Stop asking the compiler LLM to generate deterministic/discarded output fields.~~ Done —
+    ADR-050. User rejected further prompt/retry tuning, asking for a genuine speed+quality fix, not
+    a trade-off. Audited `MusicAIPromptPackageSchema` and found `providerId`/`providerDisplayName`/
+    `providerProfileVersion`/`profileVerifiedAt`/`strategy`/`theoryRationale`/`warnings`/
+    `toolInstructions`/`copyBundle`/`promptQuality` were all either already known server-side,
+    mechanically derivable from spec, or (for `promptQuality`) unconditionally discarded by the
+    Stage F evaluator every call. New `CompilerOutputSchema` narrows what Mock/Gemini must produce
+    to the five genuinely creative fields; new `src/compiler/deterministicFields.ts` assembles the
+    rest. `SCHEMA_VERSION` unchanged (internal restructuring, not a persisted-shape change). All 169
+    unit tests pass.
+24. ~~Fix a real Gemini API hang triggered by unbounded array fields.~~ Partial — ADR-051. Live-
+    verifying item 23 kept hitting the same ~90s timeout pattern, including on a previously-fast
+    sentence. Diagnosed directly instead of assuming external slowdown: ruled out API-key/config
+    loading (a raw minimal call succeeded in 10s); reproduced a 180s+ hang by calling the SDK
+    directly with the real system instruction + real schema, bypassing the app entirely; isolated
+    that neither component alone was slow (18.6s and 10.2s respectively) but the combination hung;
+    found that adding `.max()` bounds to previously-unbounded array fields (`theoryAddressal`,
+    `unsupportedIntents`, `revisionLevers`, `guidanceTags`, `suggestedProviderIds`) let a reduced
+    version of the same request succeed in 16.5s. Applied the bounds to the real schema. **Honest
+    result**: a live retest through the actual demo endpoint after this fix still hit the 90s
+    timeout — the fix is not confirmed to fully resolve the hang. Kept anyway as a reasonable
+    schema-hygiene improvement; further live diagnosis paused (time/cost) per user decision.
+25. **Next actual work**: replacing the in-memory demo rate limiter with a shared store (Vercel
     KV/Upstash Redis) before actual Vercel deployment is now a concrete, well-scoped pre-deployment
     task (ADR-046); the larger structure/emotionCurve/contrastPlan/hookPlan inference
     follow-up to item 17 is now a real, well-scoped candidate; translating `/dashboard` and the

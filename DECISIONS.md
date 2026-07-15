@@ -1534,6 +1534,150 @@ required trading away the just-added theory grounding (ADR-048) to gain speed �
 
 ---
 
+## ADR-050 — Stop asking the compiler LLM to generate deterministic/discarded fields (`CompilerOutputSchema`)
+
+- Status: Accepted
+- Date: 2026-07-15
+
+### Decision
+
+The user rejected further prompt/retry tuning as the ceiling and asked for a genuine fix that
+improves speed **and** theory-fidelity simultaneously, using current AI-integration techniques —
+not a trade-off between the two. Researched Gemini's Interactions API caching first: implicit
+caching on repeated system-instruction prefixes is already automatic for Gemini 2.5+ models with
+no manual/explicit caching API to additionally invoke, so there was no caching-side lever left to
+pull.
+
+Auditing `MusicAIPromptPackageSchema` (`src/domain/promptPackage/schema.ts`) against what a
+compile call (Mock or Gemini) was actually required to produce found the real, actionable lever:
+several required fields need **zero creative reasoning** from the LLM:
+
+- `providerId`/`providerDisplayName`/`providerProfileVersion`/`profileVerifiedAt`/`strategy` —
+  already known server-side from the `provider`/`strategy` call parameters.
+- `theoryRationale` (8 fields) — 100% mechanically derivable from `spec`, proven by the fact that
+  `mockOutputBuilders.ts` already computed every one of them with plain data extraction and zero
+  LLM involvement.
+- `warnings` — a pure echo of `theorySummary.engineWarnings.map(w => w.message)`.
+- `toolInstructions` — a one-line template (`Paste the fields above into ${provider.displayName}.`).
+- `copyBundle` — string concatenation of fields already present elsewhere in the response.
+- `promptQuality` (11 scores + issues + notes) — confirmed via `pipeline.ts` that this Stage-D
+  value is **unconditionally overwritten** by the separate Stage F evaluator's result. Whatever the
+  compiler produced here was generated, validated, and discarded on every single call — the single
+  largest structured sub-object in the schema, for zero benefit.
+
+None of this trades away real creative substance — every removed field was either already known or
+unconditionally thrown away. Cutting it is pure waste-removal, expected to reduce required output
+tokens (a primary latency driver for schema-constrained generation) with no loss of theory-
+groundedness, since the genuinely creative fields (`genericDesignSummary`, `fields`,
+`unsupportedIntents`, `revisionLevers`, `theoryAddressal`) are untouched.
+
+### Implementation
+
+- New `CompilerOutputSchema` (`.omit()` of the ten deterministic/discarded fields from
+  `MusicAIPromptPackageSchema`) is now the schema Mock/Gemini compile and repair calls must satisfy.
+  `MusicAIPromptPackageSchema`'s own shape is unchanged, so `SCHEMA_VERSION` was **not** bumped —
+  this is an internal change to which fields the LLM generates, not a persisted-schema/API-contract
+  change.
+- New `src/compiler/deterministicFields.ts` centralizes the deterministic-assembly logic (extracted
+  from `mockOutputBuilders.ts`'s existing inline computation, proving it was never LLM-dependent):
+  `buildTheoryRationale`, `buildToolInstructions`, `buildWarningsList`, `buildCopyBundle`,
+  `placeholderQuality`, and `assembleFullPackage` (combines provider metadata + these deterministic
+  fields + the LLM's `CompilerOutput` into the full `MusicAIPromptPackage`).
+- `src/compiler/pipeline.ts`: Stage D/G now operate on `CompilerOutput`; `assembleFullPackage` runs
+  right after Stage E/G succeed and **before** Stage F, because `buildEvaluatePayload` (Mock) and
+  the real evaluator both read fields like `pkg.theoryRationale.hook` from the package being scored.
+  Stage H's final `MusicAIPromptPackageSchema.parse(finalPackage)` is unchanged — it remains the
+  ultimate full-contract safety net regardless of this internal restructuring.
+- `geminiPromptCompiler.ts`/`mockPromptCompiler.ts`/`compiler/types.ts`: schema and return-type swap
+  to `CompilerOutputSchema`/`CompilerOutput`. `validateTheoryAddressal.ts`'s parameter type narrows
+  to `CompilerOutput` (type-only change — it only ever read `.theoryAddressal`).
+- `provider-compiler.system.md`/`prompt-repair.system.md`: added a short note scoping the model's
+  job to the five creative fields, since the earlier instructions referenced the full package shape
+  by name.
+- New `tests/unit/deterministicFields.test.ts` (7 tests) verifies each helper against spec fixtures;
+  all 169 project unit tests pass unchanged otherwise.
+
+### Reason
+
+Generating and validating structured sub-objects an LLM call never needed to produce, including one
+unconditionally discarded every single time, is pure cost with no offsetting benefit. Removing it is
+a genuine "faster without sacrificing quality" change rather than a tuning trade-off, directly
+answering the user's request to find such a fix rather than continue trading speed against
+richness.
+
+---
+
+## ADR-051 — Bound array fields in the compiler output schema (real Gemini API hang, not a config or session-wide slowdown)
+
+- Status: Accepted, effectiveness partially unconfirmed — documented honestly
+- Date: 2026-07-15
+
+### Decision
+
+Live-verifying ADR-050 kept hitting the same ~90s timeout/Mock-fallback pattern seen before
+ADR-049 — including, surprisingly, on a previously-fast simple sentence. Rather than assume this
+was another external Gemini slowdown (the prior session's default explanation), it was diagnosed
+directly:
+
+1. **Ruled out API-key/config loading as the cause**: a minimal raw `client.interactions.create()`
+   call (short instruction, no schema) using the exact same `.env.local` config succeeded in 10s.
+2. **Reproduced the hang completely outside the app**: calling the SDK directly with the real
+   `provider-compiler.system.md` system instruction (6.4KB) and the real `CompilerOutputSchema`
+   JSON schema (bypassing the entire app/pipeline) still hung with **no response after 180s**,
+   proving this is not an application-code bug.
+3. **Isolated which component was responsible**: the real system instruction alone (with a tiny
+   schema) completed in 18.6s; the real schema alone (with a tiny system instruction) completed in
+   10.2s. Only the *combination* of both hung indefinitely — not simply additive slowness.
+4. **Found a plausible mechanism**: several array fields in the schema
+   (`theoryAddressal`/`unsupportedIntents`/`revisionLevers`/`guidanceTags`/`suggestedProviderIds`)
+   had no `.max()` bound. A reduced schema with the same shape but `.max()` bounds added on those
+   arrays, paired with the same real system instruction, completed in 16.5s — consistent with
+   Gemini's schema-constrained decoding failing to terminate array generation when array length is
+   unbounded and the system instruction is long enough to add reasoning pressure.
+
+### Implementation
+
+Added `.max()` bounds directly to `MusicAIPromptPackageSchema`
+(`src/domain/promptPackage/schema.ts`): `guidanceTags` (8), `suggestedProviderIds` (5),
+`unsupportedIntents` (8), `revisionLevers` (8), `theoryAddressal` (7 — one per composition-theory
+engine). All 169 unit tests still pass.
+
+### Honest verification result — do not oversell
+
+A live retest through the actual demo endpoint **after** this fix still hit the 90s timeout and
+fell back to Mock. This means the array-bound fix is **not confirmed** to fully resolve the hang;
+the earlier 16.5s success may have been partly coincidental timing rather than a complete fix, or
+the bound values chosen (7-8) may still be large enough to trigger the same failure mode that
+`.max(3)` in the diagnostic test avoided. Given the substantial real API time and cost already
+spent on this investigation in a single session, further live diagnostic Gemini calls were
+deliberately paused (user decision) rather than continuing to iterate blindly.
+
+The `.max()` bounds are kept regardless: they are a safe, reasonable schema-hygiene improvement on
+their own merits (an "unlimited" array was never actually desired for any of these fields), even
+though they are not proven to be a complete fix for the underlying hang. The underlying hang
+mechanism (long system instruction + structured schema causing Gemini to fail to terminate
+generation) remains only partially understood and is **not** considered resolved.
+
+### Reason
+
+Directly answers the user's suspicion that Gemini API calls might not be "loading" correctly by
+proving they are (config verified working via a raw call), while also correcting the session's
+earlier default assumption that repeated timeouts meant "the API is just slow right now" — a
+controlled, app-bypassing reproduction showed a specific, isolatable interaction between prompt
+length and schema shape instead. Documenting the partial, unconfirmed nature of the current
+mitigation honestly rather than claiming a fix that live evidence didn't fully support.
+
+### Next steps (not yet started)
+
+- Test smaller `.max()` values (e.g. 3-4) matching what was proven to work in the diagnostic
+  reduction, once further live Gemini testing resumes.
+- Consider splitting the single compile call into two smaller calls (e.g. theory-addressal
+  generation separate from field/summary generation) to reduce combined schema+instruction
+  complexity per call, per the user's own suggested direction.
+- Consider whether the system instruction can be compressed further beyond the ADR-049 ~40% cut.
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:

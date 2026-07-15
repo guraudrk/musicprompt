@@ -1,5 +1,5 @@
 import type { CompositionTheorySpec } from "@/domain/songDesignSpec/theory";
-import type { MusicAIPromptPackage } from "@/domain/promptPackage/schema";
+import type { CompilerOutput } from "@/domain/promptPackage/schema";
 
 function warningKey(entry: { engine: string; message: string }): string {
   return `${entry.engine}:${entry.message}`;
@@ -22,7 +22,7 @@ function warningKey(entry: { engine: string; message: string }): string {
  */
 export function validateTheoryAddressal(
   theorySummary: CompositionTheorySpec,
-  pkg: MusicAIPromptPackage,
+  pkg: CompilerOutput,
 ): string[] {
   const errors: string[] = [];
   const requiredWarnings = theorySummary.engineWarnings.filter(

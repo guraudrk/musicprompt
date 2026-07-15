@@ -15,7 +15,7 @@ export const PromptFieldsSchema = z.object({
   negativePrompt: z.string().optional(),
   exclude: z.string().optional(),
   title: z.string().optional(),
-  guidanceTags: z.array(z.string()).optional(),
+  guidanceTags: z.array(z.string()).max(8).optional(),
   structureNotes: z.string().optional(),
   advancedParameters: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
 });
@@ -36,7 +36,7 @@ export type TheoryRationale = z.infer<typeof TheoryRationaleSchema>;
 export const UnsupportedIntentSchema = z.object({
   intent: z.string().min(1),
   reason: z.string().min(1),
-  suggestedProviderIds: z.array(z.string()).optional(),
+  suggestedProviderIds: z.array(z.string()).max(5).optional(),
 });
 export type UnsupportedIntent = z.infer<typeof UnsupportedIntentSchema>;
 
@@ -62,6 +62,11 @@ export const TheoryAddressalSchema = z.object({
 });
 export type TheoryAddressal = z.infer<typeof TheoryAddressalSchema>;
 
+// Array fields the LLM must generate (theoryAddressal/unsupportedIntents/revisionLevers/
+// guidanceTags/suggestedProviderIds) carry .max() bounds because an unbounded array in Gemini's
+// schema-constrained decoding, combined with a long system instruction, reproducibly hangs past
+// 180s with no response — confirmed by isolating system-instruction size, schema size, and array
+// boundedness independently against the real API (ADR-051). Bounding array length resolves it.
 export const MusicAIPromptPackageSchema = z.object({
   providerId: z.string().min(1),
   providerDisplayName: z.string().min(1),
@@ -73,13 +78,37 @@ export const MusicAIPromptPackageSchema = z.object({
 
   fields: PromptFieldsSchema,
   theoryRationale: TheoryRationaleSchema,
-  unsupportedIntents: z.array(UnsupportedIntentSchema),
+  unsupportedIntents: z.array(UnsupportedIntentSchema).max(8),
   warnings: z.array(z.string()),
   toolInstructions: z.array(z.string()),
-  revisionLevers: z.array(RevisionLeverSchema),
-  theoryAddressal: z.array(TheoryAddressalSchema),
+  revisionLevers: z.array(RevisionLeverSchema).max(8),
+  theoryAddressal: z.array(TheoryAddressalSchema).max(7),
 
   promptQuality: PromptQualityReportSchema,
   copyBundle: z.string(),
 });
 export type MusicAIPromptPackage = z.infer<typeof MusicAIPromptPackageSchema>;
+
+/**
+ * The subset of `MusicAIPromptPackage` that actually requires creative reasoning from a compiler
+ * (Mock or Gemini) — everything else (provider metadata, `theoryRationale`, `warnings`,
+ * `toolInstructions`, `copyBundle`, and `promptQuality`) is either already known server-side or
+ * mechanically derivable from the input spec/fields, and is assembled deterministically in
+ * `src/compiler/deterministicFields.ts` after a compile succeeds (ADR-050). Asking the LLM to also
+ * generate those fields was pure wasted output — `promptQuality` in particular is unconditionally
+ * overwritten by the separate Stage F evaluator's result (`pipeline.ts`), so whatever a compiler
+ * produced there was previously generated, validated, and discarded on every single call.
+ */
+export const CompilerOutputSchema = MusicAIPromptPackageSchema.omit({
+  providerId: true,
+  providerDisplayName: true,
+  providerProfileVersion: true,
+  profileVerifiedAt: true,
+  strategy: true,
+  theoryRationale: true,
+  warnings: true,
+  toolInstructions: true,
+  promptQuality: true,
+  copyBundle: true,
+});
+export type CompilerOutput = z.infer<typeof CompilerOutputSchema>;

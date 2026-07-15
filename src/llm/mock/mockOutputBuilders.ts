@@ -1,7 +1,7 @@
 import type { SongDesignSpec } from "@/domain/songDesignSpec/schema";
 import type { ProviderCapabilityProfile } from "@/domain/providerCapability/schema";
 import type { CompositionTheorySpec } from "@/domain/songDesignSpec/theory";
-import type { MusicAIPromptPackage, Strategy, TheoryAddressal, UnsupportedIntent } from "@/domain/promptPackage/schema";
+import type { CompilerOutput, Strategy, TheoryAddressal, UnsupportedIntent } from "@/domain/promptPackage/schema";
 import type { PromptQualityReport, EvaluationIssue } from "@/domain/evaluation/schema";
 import type { ProviderCompilerInput, PromptEvaluationInput } from "@/compiler/types";
 
@@ -81,30 +81,14 @@ function buildTheoryAddressal(theorySummary: CompositionTheorySpec): TheoryAddre
     }));
 }
 
-function placeholderQuality(strategy: Strategy): PromptQualityReport {
-  const neutral = 50;
-  return {
-    strategy,
-    scores: {
-      northStarAlignment: neutral,
-      differenceRealization: neutral,
-      clarity: neutral,
-      coherence: neutral,
-      controllability: neutral,
-      providerCompatibility: neutral,
-      hookStrategy: neutral,
-      repetitionAndMeaning: neutral,
-      lyricMusicAlignment: neutral,
-      overloadRisk: neutral,
-      originalityGuardrails: neutral,
-    },
-    issues: [],
-    overallNotes: "Pending independent evaluation (Stage F).",
-  };
-}
-
-/** Stage D (Mock): deterministically builds a MusicAIPromptPackage from structured spec input. */
-export function buildCompilePayload(input: ProviderCompilerInput): MusicAIPromptPackage {
+/**
+ * Stage D (Mock): deterministically builds the creative-only `CompilerOutput` from structured spec
+ * input (ADR-050) — provider metadata, theoryRationale, warnings, toolInstructions, promptQuality,
+ * and copyBundle are no longer part of a compiler's job; they're assembled deterministically in
+ * `src/compiler/deterministicFields.ts` after Stage E validates this output, for both Mock and
+ * Gemini alike.
+ */
+export function buildCompilePayload(input: ProviderCompilerInput): CompilerOutput {
   const { spec, provider, strategy, theorySummary } = input;
   const strategyProfile = STRATEGY_PROFILES[strategy];
 
@@ -112,23 +96,12 @@ export function buildCompilePayload(input: ProviderCompilerInput): MusicAIPrompt
     .filter((line): line is string => Boolean(line && line.trim().length > 0))
     .join("\n");
 
-  const selectedHook = spec.hookPlan.candidates.find((h) => h.id === spec.hookPlan.selectedId);
-  const selectedCore =
-    spec.generativeCore.combinedCore ??
-    spec.generativeCore.candidates.find((c) => spec.generativeCore.selectedCandidateIds.includes(c.id))?.description ??
-    "unspecified";
-
   const style = buildStyleText(spec, strategyProfile);
   const prompt = buildPromptText(spec, strategyProfile);
   const title = spec.identity.workingTitle;
   const negativePrompt = spec.exclusions.join(", ") || undefined;
 
   return {
-    providerId: provider.providerId,
-    providerDisplayName: provider.displayName,
-    providerProfileVersion: provider.profileVersion,
-    profileVerifiedAt: provider.lastVerifiedAt,
-    strategy,
     genericDesignSummary: `${spec.northStar.audienceExperience} (${strategyProfile.label} strategy)`,
     fields: {
       prompt,
@@ -139,23 +112,9 @@ export function buildCompilePayload(input: ProviderCompilerInput): MusicAIPrompt
       guidanceTags: buildGuidanceTags(spec, strategyProfile),
       structureNotes: spec.structure.map((s) => `${s.name}: ${s.dramaticFunction}`).join(" -> "),
     },
-    theoryRationale: {
-      northStar: spec.northStar.audienceExperience,
-      selectedCore,
-      deliberateDifferences: spec.deliberateDifferences.map((d) => `${d.dimension}: ${d.fromReference} -> ${d.toNew}`),
-      form: spec.structure.map((s) => s.name).join(" > "),
-      contrast: spec.contrastPlan.map((c) => c.description),
-      hook: selectedHook?.description ?? "unselected",
-      repetition: spec.repetitionPlan.meaningShifts.map((m) => m.line).join("; "),
-      lyrics: spec.lyricsDesign.mode,
-    },
     unsupportedIntents: collectUnsupportedIntents(spec, provider),
-    warnings: theorySummary.engineWarnings.map((w) => w.message),
-    toolInstructions: [`Paste the fields above into ${provider.displayName}.`],
     revisionLevers: [],
     theoryAddressal: buildTheoryAddressal(theorySummary),
-    promptQuality: placeholderQuality(strategy),
-    copyBundle: `Title: ${title ?? "Untitled"}\n\nStyle: ${style}\n\nLyrics:\n${lyricsBody}\n\nExclude: ${negativePrompt ?? "none"}`,
   };
 }
 

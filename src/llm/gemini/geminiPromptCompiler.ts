@@ -1,7 +1,7 @@
 import "server-only";
 import type { LLMProvider } from "@/llm/types";
 import type { PromptCompiler, ProviderCompilerInput, PromptRepairInput, CompilerMetadata } from "@/compiler/types";
-import { MusicAIPromptPackageSchema, type MusicAIPromptPackage } from "@/domain/promptPackage/schema";
+import { CompilerOutputSchema, type CompilerOutput } from "@/domain/promptPackage/schema";
 import { getGeminiEnvConfig } from "@/lib/env";
 import { GeminiLLMProvider } from "./geminiLLMProvider";
 import { readSystemInstructionTemplate } from "./readTemplate";
@@ -18,21 +18,21 @@ export class GeminiPromptCompiler implements PromptCompiler {
     this.metadata = { model: config.model, apiMode: config.apiMode, promptTemplateVersion: PROMPT_TEMPLATE_VERSION };
   }
 
-  async compile(input: ProviderCompilerInput): Promise<MusicAIPromptPackage> {
+  async compile(input: ProviderCompilerInput): Promise<CompilerOutput> {
     return this.llm.generateStructured({
       task: "compile-prompt-package",
       systemInstruction: PROVIDER_COMPILER_SYSTEM_INSTRUCTION,
       payload: input,
-      schema: MusicAIPromptPackageSchema,
+      schema: CompilerOutputSchema,
     });
   }
 
-  async repair(input: PromptRepairInput): Promise<MusicAIPromptPackage> {
+  async repair(input: PromptRepairInput): Promise<CompilerOutput> {
     return this.llm.generateStructured({
       task: "repair-prompt-package",
       systemInstruction: PROMPT_REPAIR_SYSTEM_INSTRUCTION,
       payload: input,
-      schema: MusicAIPromptPackageSchema,
+      schema: CompilerOutputSchema,
     });
   }
 }

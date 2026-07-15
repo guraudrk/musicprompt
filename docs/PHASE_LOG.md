@@ -1557,3 +1557,63 @@ See `DECISIONS.md` ADR-049.
   follow-up) — still pending.
 - Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first-sixth slices is still
   pending.
+
+## Schema-slimming + array-bound Gemini hang investigation (2026-07-15, ADR-050/ADR-051)
+
+### Why
+
+The user rejected further prompt/retry tuning as good enough, asking to find a genuine way — using
+current AI-integration techniques, not a trade-off — to make the demo both fast **and** faithfully
+theory-grounded. Also asked directly whether Gemini API calls might not be "loading" correctly,
+given repeated timeouts.
+
+### What shipped (ADR-050)
+
+Audited `MusicAIPromptPackageSchema` and found ten fields a compile call never needed an LLM for:
+provider metadata (already known server-side), `theoryRationale`/`warnings`/`toolInstructions`/
+`copyBundle` (mechanically derivable, proven by Mock's own existing inline computation), and
+`promptQuality` (unconditionally overwritten by the separate Stage F evaluator every call — pure
+generated-and-discarded waste). New `CompilerOutputSchema` narrows what Mock/Gemini must produce to
+the five genuinely creative fields; new `src/compiler/deterministicFields.ts` assembles the rest
+after Stage E validates the LLM's output and before Stage F scores the assembled package.
+`SCHEMA_VERSION` unchanged — internal restructuring only. All 169 unit tests pass.
+
+### What was diagnosed (ADR-051)
+
+Live-verifying ADR-050 kept hitting the same ~90s timeout pattern seen before ADR-049, including on
+a previously-fast sentence — instead of assuming another external slowdown, this was diagnosed
+directly:
+
+- A raw, minimal Gemini call (no schema, short instruction) succeeded in 10s — ruling out API-key/
+  config loading as the cause.
+- Calling the SDK directly with the real system instruction + real schema, bypassing the entire
+  app, still hung with no response after 180s — proving this isn't an application bug.
+- The real system instruction alone (18.6s) and the real schema alone (10.2s) were both fine; only
+  the combination hung.
+- A reduced schema with `.max()` bounds added to previously-unbounded arrays succeeded in 16.5s with
+  the same real system instruction, pointing at unbounded arrays in schema-constrained decoding as
+  a plausible mechanism.
+
+Applied `.max()` bounds to `theoryAddressal`/`unsupportedIntents`/`revisionLevers`/`guidanceTags`/
+`suggestedProviderIds` in the real schema.
+
+### Honest result — not oversold
+
+A live retest through the actual demo endpoint after applying the bounds **still hit the 90s
+timeout**. The fix is not confirmed to fully resolve the hang — the earlier 16.5s success may have
+been partly coincidental. The `.max()` bounds are kept regardless as a reasonable, low-risk schema
+improvement on their own merits, but the underlying hang is only partially understood. Given the
+substantial real API time/cost already spent this session, further live diagnostic Gemini calls
+were deliberately paused per the user's decision rather than continuing to iterate blindly.
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-050 and ADR-051.
+
+### Known gaps carried forward
+
+- The real Gemini hang on (long system instruction + structured schema) requests is not confirmed
+  fixed; candidate next steps (smaller `.max()` values, splitting into two smaller calls,
+  compressing the system instruction further) are recorded in ADR-051 but not yet attempted.
+- Everything already carried forward from ADR-049 (shared-store rate limiting, 3-way-concurrent
+  latency risk, spec-interpreter inference follow-up, Phase 0-7 open items) is still pending.

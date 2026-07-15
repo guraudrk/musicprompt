@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { validateTheoryAddressal } from "@/compiler/validateTheoryAddressal";
 import type { CompositionTheorySpec } from "@/domain/songDesignSpec/theory";
-import type { MusicAIPromptPackage, TheoryAddressal } from "@/domain/promptPackage/schema";
+import type { CompilerOutput, TheoryAddressal } from "@/domain/promptPackage/schema";
 
 function makeTheorySummary(overrides: Partial<CompositionTheorySpec> = {}): CompositionTheorySpec {
   return {
@@ -14,8 +14,8 @@ function makeTheorySummary(overrides: Partial<CompositionTheorySpec> = {}): Comp
   };
 }
 
-function makePkg(theoryAddressal: TheoryAddressal[]): MusicAIPromptPackage {
-  return { theoryAddressal } as unknown as MusicAIPromptPackage;
+function makePkg(theoryAddressal: TheoryAddressal[]): CompilerOutput {
+  return { theoryAddressal } as unknown as CompilerOutput;
 }
 
 describe("validateTheoryAddressal (ADR-045: only warning/blocking severity is required)", () => {
