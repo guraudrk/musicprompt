@@ -699,7 +699,20 @@ Each requires official capability verification and tests.
     resolves. Pure client-side UX change, no backend/schema change. New dictionary keys
     (`previewBadge`/`upgradingNotice`, en/ko/ja). Live-verified with the user's exact idea:
     screenshotted both the instant-preview and final-result states.
-21. **Next actual work**: replacing the in-memory demo rate limiter with a shared store (Vercel
+21. ~~Bouncing "refining" animation + ground the compiler directly in the composition-theory
+    document.~~ Done — ADR-048. Verified both knowledge files first: lyrics knowhow was already
+    fully cited in `lyrics-draft.system.md`; the composition-theory document (~880 lines, real
+    Berklee/USC Thornton/NYU Steinhardt/Juilliard + academic sources) was the actual gap — the main
+    `provider-compiler.system.md` only ever saw the 7 engines' structural warnings, never the
+    document's actual written principles. Added a new cited section embedding curated excerpts (7
+    core principles, genre-specific topline guidance, AI-prompting-specific advice) — not the full
+    file. Also added a bouncing 3-note emoji animation (`noteBounce` keyframe) to the demo's
+    upgrading notice. Live-verified: the same idea's `theoryAddressal` resolutions became
+    noticeably more theory-literate (e.g. citing silence-before-final-chorus, minor-to-major
+    harmonic movement) versus the pre-change output; confirmed the animation genuinely animates via
+    computed-style diffing. Disclosed cost: latency rose from ~37s to ~70s for the same call
+    (already-accepted trade-off per ADR-047's instant-preview UX). No schema/test changes.
+22. **Next actual work**: replacing the in-memory demo rate limiter with a shared store (Vercel
     KV/Upstash Redis) before actual Vercel deployment is now a concrete, well-scoped pre-deployment
     task (ADR-046); the larger structure/emotionCurve/contrastPlan/hookPlan inference
     follow-up to item 17 is now a real, well-scoped candidate; translating `/dashboard` and the

@@ -427,6 +427,10 @@ Gemini responsibilities:
 - Produce revision levers
 - Address every active (non-dismissed) composition-theory engine warning with a traceable
   `theoryAddressal` entry (verbatim engine/message, concrete resolution) — never silently ignore one
+- Ground the compiled prose directly in the cited composition-theory document
+  (`knowledge/composition_theory/top_music_school_general_composition.txt`) — the 7 core
+  principles, genre-specific topline guidance, and AI-prompting-specific advice — not just the
+  engines' structural warnings
 - Return only the agreed JSON structure
 
 Gemini must not:

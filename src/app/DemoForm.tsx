@@ -79,7 +79,16 @@ export function DemoForm() {
           <p>
             <span className={styles.demoPreviewBadge}>{dict.demoForm.previewBadge}</span> {previewLine}
           </p>
-          {loading && <p className={styles.demoUpsell}>{dict.demoForm.upgradingNotice}</p>}
+          {loading && (
+            <p className={styles.demoUpsell}>
+              <span className={styles.upgradingNotes} aria-hidden="true">
+                <span>🎵</span>
+                <span>🎶</span>
+                <span>🎵</span>
+              </span>
+              {dict.demoForm.upgradingNotice}
+            </p>
+          )}
         </div>
       )}
 

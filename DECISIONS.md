@@ -1406,6 +1406,74 @@ existing practice of live/screenshot verification for UI-only changes).
 
 ---
 
+## ADR-048 — Bouncing "refining" animation + ground the main compiler directly in the composition-theory document
+
+- Status: Accepted
+- Date: 2026-07-15
+
+### Decision
+
+Two requests: (1) make the demo's "upgrading" notice feel visibly alive rather than static text,
+and (2) make Gemini's main compile step directly reference the attached theory knowledge files for
+noticeably more sophisticated output, not just the 7 engines' structural warnings.
+
+**Investigated both knowledge files in full before changing anything** (verify-before-claiming,
+same discipline as ADR-040's Craft-card citation):
+
+- `knowledge/lyrics/user_lyrics_knowhow.txt` (22 lines) — already directly cited by name in
+  `lyrics-draft.system.md`, all 15 numbered techniques individually operationalized. No gap here;
+  no change made.
+- `knowledge/composition_theory/top_music_school_general_composition.txt` (~880 lines, real cited
+  sources: Berklee/USC Thornton/NYU Steinhardt/Juilliard curricula, Music Theory Online, arXiv
+  papers) — **this was the actual gap**. `provider-compiler.system.md` (the main Safe/Balanced/Bold
+  compiler) never quoted or embedded any of this document's real content; it only ever received the
+  7 engines' structural TS-heuristic warnings, which are "inspired by" the document but not its
+  actual written principles.
+
+**Fix — animation**: `DemoForm.tsx`'s upgrading notice gets 3 staggered-bouncing music-note emoji
+(`🎵🎶🎵`, `aria-hidden`) via a new `noteBounce` keyframe in `Hero.module.css`, matching the shape of
+the existing `scrollHintBounce` keyframe in the same file. No new image asset (avoids reopening the
+image-licensing verification ADR-035/036 already did for the hero background); the existing global
+`prefers-reduced-motion` rule in `globals.css` already collapses this animation's duration to ~0,
+no extra handling needed.
+
+**Fix — theory grounding**: added a new cited section to `provider-compiler.system.md` embedding
+curated excerpts from three of the document's most directly actionable parts — the 7 core
+principles (§0), genre-specific topline guidance (§8: Pop/Ballad/R&B/Rock/K-pop/OST), and the
+document's own AI-generation-specific prompting advice (§9: name sections explicitly, specify
+repetition/variation and density changes explicitly, don't over-mix genres). Not the full
+880-line file — curated to what's directly actionable for compiling a prompt, mirroring how
+`lyrics-draft.system.md` already curates rather than dumps its source file. `docs/PRODUCT_SPEC.md`
+Stage D's Gemini-responsibilities list updated to name this explicitly. No schema change — this
+only enriches generation quality of existing `fields.style`/`fields.prompt`/`fields.structureNotes`,
+not new output structure; Mock is unaffected (plain TS templating, never reads prompt files).
+
+### Disclosed trade-off
+
+A larger system prompt predictably costs some real latency — consistent with ADR-045's
+already-observed pattern. Live-verified: the same demo idea that took ~37s before this change took
+~70s after. Considered acceptable because ADR-047's instant-preview UX already absorbs the
+perceived wait; not re-litigated with the user again since the trade-off was already accepted in
+that ADR.
+
+### Verification
+
+- Live, real Gemini, same exact idea as ADR-046/047's verification
+  ("기차역에서의 씁쓸한 이별, 남녀 대화 형식, kpop과 jpop의 융합"): the new `theoryAddressal`
+  resolutions are concretely more theory-literate than before — e.g. "designed a momentary
+  silence/pause right before the final chorus entry to maximize emotional release" (directly
+  reflects the document's tension-and-release + silence-as-rhythmic-choice + final-chorus-expansion
+  principles) and "introduced a bittersweet progression using minor-to-major movements characteristic
+  of K-pop/J-pop ballads" (harmonic-gravity/modal-interchange grounding) — not just generic
+  acknowledgments.
+- Confirmed the note animation genuinely animates (not a static image) by reading the computed
+  `transform` of a note span at two points in time and confirming the value changed, in addition to
+  visual screenshot review.
+- `pnpm typecheck`/`lint`/`build` pass; no test-file changes needed (no schema/behavior contract
+  changed, only prompt text/CSS/JSX).
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:

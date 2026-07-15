@@ -1441,3 +1441,61 @@ real Gemini + theory intact).
   follow-up) — still pending.
 - Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first-sixth slices is still
   pending.
+
+---
+
+## Bouncing note animation + direct theory-document grounding (2026-07-15, ADR-048)
+
+### 한글 요약
+
+- 사용자가 "실제 Gemini + 작곡 이론으로 다듬는 중..." 문구를 더 톡톡 튀게(음표 이모티콘 애니메이션)
+  만들어달라고 했고, 동시에 Gemini가 컴파일할 때 실제로 첨부된 이론 파일을 직접 참고해서 더 고급
+  스럽고 세세한 프롬프트가 나오게 해달라고 요청했습니다.
+- 두 지식 파일을 먼저 전체 다 읽어서 확인했습니다: 가사 노하우 파일(`user_lyrics_knowhow.txt`)은
+  이미 `lyrics-draft.system.md`에서 15개 기법 전부를 이름까지 인용하며 실제로 쓰이고 있었습니다.
+  반면 작곡 이론 파일(`top_music_school_general_composition.txt`, 약 880줄, Berklee/USC
+  Thornton/NYU Steinhardt/Juilliard 커리큘럼 + 학술 논문 기반)은 진짜 공백이었습니다 — 메인 컴파일
+  프롬프트(`provider-compiler.system.md`)는 7개 엔진이 만든 구조적 경고만 받을 뿐, 문서의 실제
+  내용은 한 번도 직접 인용한 적이 없었습니다.
+- 전체 880줄을 다 넣는 대신, 가장 실질적으로 활용 가능한 세 부분(7가지 핵심 원칙, 장르별 톱라인
+  가이드, AI 음악 생성 프롬프트 작성 조언)을 발췌해서 컴파일 프롬프트에 직접 인용·삽입했습니다.
+- 음표 애니메이션은 `noteBounce` 키프레임으로 3개의 음표 이모지(🎵🎶🎵)가 시차를 두고 통통 튀도록
+  만들었고, 새 이미지 자산 없이 이모지만 사용해서(기존 히어로 배경 이미지 라이선스 검증 과정을
+  다시 거칠 필요 없음) 로딩 비용도 없습니다.
+- **라이브 검증**: 같은 문장으로 이전/이후를 비교했더니, `theoryAddressal`의 해결 방식이 눈에 띄게
+  더 이론적으로 정교해졌습니다 — 예: "마지막 코러스 진입 직전에 의도적인 침묵을 배치해 감정적 해소를
+  극대화"(긴장과 해소 + 침묵을 리듬적 선택으로 + 마지막 코러스 확장 원칙을 직접 반영), "K-pop/J-pop
+  발라드 특유의 단조→장조 진행을 도입"(화성적 중력/모달 인터체인지 개념 반영) 등. 다만 프롬프트가
+  길어진 만큼 응답 시간도 37초 → 70초로 늘어났는데, 이건 이미 직전 슬라이스(ADR-047)의 즉시
+  미리보기 UX로 체감을 흡수하기로 합의된 트레이드오프라 다시 여쭤보지 않고 그대로 반영했습니다.
+
+### What shipped
+
+- `src/llm/gemini/prompts/provider-compiler.system.md` — new cited "Grounding in real songwriting
+  pedagogy" section (7 core principles, genre topline guidance, AI-prompting advice, curated from
+  `knowledge/composition_theory/top_music_school_general_composition.txt`).
+- `docs/PRODUCT_SPEC.md` — Stage D responsibilities list updated to name this explicitly.
+- `src/app/DemoForm.tsx` + `src/app/Hero.module.css` — 3 staggered-bouncing music-note emoji next
+  to the upgrading notice (`noteBounce` keyframe, matches existing `scrollHintBounce` shape).
+
+### Live verification
+
+- Real Gemini, same idea as ADR-046/047: `theoryAddressal` resolutions markedly more
+  theory-literate (specific tension/release, silence-before-final-chorus, modal-interchange
+  references) than the pre-change baseline captured earlier the same session.
+- Confirmed the note animation genuinely animates by diffing computed `transform` values at two
+  points in time (not just a static screenshot).
+- `pnpm typecheck`/`lint`/`build` pass; no test-file changes (no schema/behavior contract changed).
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-048.
+
+### Known gaps carried forward
+
+- Shared-store-backed rate limiting (Vercel KV/Upstash) before actual Vercel deployment.
+- 3-way-concurrent Safe/Balanced/Bold real-Gemini latency/timeout risk — still not resolved.
+- Structure/emotionCurve/contrastPlan/hookPlan/compositionTheory inference (spec-interpreter
+  follow-up) — still pending.
+- Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first-sixth slices is still
+  pending.

@@ -240,6 +240,40 @@
   text-decoration: underline;
 }
 
+/* Bouncing music notes next to the "refining with real Gemini + theory" notice — communicates
+   active, real work happening, not a frozen spinner. Respects prefers-reduced-motion via the
+   global `*` animation-duration override in globals.css; no per-component override needed. */
+.upgradingNotes {
+  display: inline-flex;
+  gap: 0.15rem;
+  margin-right: 0.35rem;
+}
+
+.upgradingNotes span {
+  display: inline-block;
+  animation: noteBounce 0.9s ease-in-out infinite;
+}
+
+.upgradingNotes span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.upgradingNotes span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes noteBounce {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateY(-0.35rem);
+    opacity: 1;
+  }
+}
+
 @media screen and (max-width: 1261px) {
   .headline {
     font-size: 2rem;
