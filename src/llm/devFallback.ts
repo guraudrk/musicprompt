@@ -1,5 +1,6 @@
 import type { PromptCompiler, PromptEvaluator, ProviderCompilerInput, PromptRepairInput, PromptEvaluationInput } from "@/compiler/types";
 import type { LyricsDraftGenerator, LyricsDraftInput } from "@/lyrics/types";
+import type { SpecInterpreter, SpecInterpretInput } from "@/spec-interpreter/types";
 
 /**
  * Wraps a real (Gemini) compiler/evaluator so that in development, a failure falls back to the
@@ -93,6 +94,29 @@ export function wrapLyricsDraftGeneratorWithDevFallback(
         );
         wrapper.metadata = mock.metadata;
         return mock.draft(input);
+      }
+    },
+  };
+  return wrapper;
+}
+
+export function wrapSpecInterpreterWithDevFallback(real: SpecInterpreter, mock: SpecInterpreter): SpecInterpreter {
+  const wrapper: SpecInterpreter = {
+    metadata: real.metadata,
+    async interpret(input: SpecInterpretInput) {
+      try {
+        const result = await real.interpret(input);
+        wrapper.metadata = real.metadata;
+        return result;
+      } catch (error) {
+        if (process.env.NODE_ENV === "production") throw error;
+        console.warn(
+          `[GeminiSpecInterpreter] interpret failed, falling back to Mock in development: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        wrapper.metadata = mock.metadata;
+        return mock.interpret(input);
       }
     },
   };

@@ -1,12 +1,9 @@
 /**
- * Lightweight, deterministic keyword extraction for the no-login demo. The demo only ever
- * receives one free-text "idea" string, but the Mock compiler's Style output
- * (src/llm/mock/mockOutputBuilders.ts buildStyleText) reads structured fields
- * (musicalIdentity.genres/tempoDescription/instrumentation) that a single string can't populate
- * on its own. Without this, every demo result showed "unspecified genre at unspecified" regardless
- * of what the user actually typed — a real quality bug, not a consequence of Gemini being
- * unavailable anonymously (see DECISIONS.md ADR-042). This is plain keyword matching, not
- * classification or AI — it only ever adds a tag when a known word is actually present.
+ * Lightweight, deterministic keyword extraction shared by two Mock-only/non-AI consumers: the
+ * anonymous no-login demo (src/app/api/demo/compile/route.ts) and MockSpecInterpreter
+ * (src/spec-interpreter/mockSpecInterpreter.ts). Plain keyword matching, not classification or AI —
+ * it only ever adds a tag when a known word is actually present in the text. See DECISIONS.md
+ * ADR-042 (original demo fix) and ADR-044 (spec-interpreter reuse).
  */
 
 const GENRE_KEYWORDS: [RegExp, string][] = [

@@ -2,11 +2,13 @@ import type { ZodType } from "zod";
 import type { LLMProvider } from "@/llm/types";
 import { buildCompilePayload, buildEvaluatePayload } from "./mockOutputBuilders";
 import { buildLyricsDraftSet } from "./lyricsDraftBuilder";
+import { buildSpecInterpretation } from "./specInterpretationBuilder";
 
 export const MOCK_TASK = {
   COMPILE_PROMPT_PACKAGE: "compile-prompt-package",
   EVALUATE_PROMPT_PACKAGE: "evaluate-prompt-package",
   DRAFT_LYRICS: "draft-lyrics",
+  INTERPRET_SPEC: "interpret-spec",
 } as const;
 
 /**
@@ -33,6 +35,8 @@ export class MockLLMProvider implements LLMProvider {
         return buildEvaluatePayload(payload as Parameters<typeof buildEvaluatePayload>[0]);
       case MOCK_TASK.DRAFT_LYRICS:
         return buildLyricsDraftSet(payload as Parameters<typeof buildLyricsDraftSet>[0]);
+      case MOCK_TASK.INTERPRET_SPEC:
+        return buildSpecInterpretation(payload as Parameters<typeof buildSpecInterpretation>[0]);
       default:
         throw new Error(`MockLLMProvider has no deterministic output registered for task "${task}".`);
     }

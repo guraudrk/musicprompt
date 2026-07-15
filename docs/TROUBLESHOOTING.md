@@ -565,8 +565,10 @@ fell through to their `"unspecified"` defaults; (2) an earlier fix had set
 description" with "lyric text the user actually wrote," producing a verbatim-echo `fields.lyrics`
 instead of anything resembling generated content.
 
-**Fix:** Added `src/app/api/demo/compile/extractHints.ts`, deterministic EN/KO/JA regex keyword
-matching (genre, tempo, vocal gender) — explicitly not classification/AI, to preserve the demo's
+**Fix:** Added a deterministic EN/KO/JA regex keyword matcher (originally
+`src/app/api/demo/compile/extractHints.ts`, later relocated to
+`src/domain/songDesignSpec/extractHints.ts` in ADR-044 so the spec-interpreter feature could share
+it — genre, tempo, vocal gender) — explicitly not classification/AI, to preserve the demo's
 Mock-only safety guarantee. The route now populates the structured spec fields from these hints
 when found, and no longer echoes the idea into `lyricsDesign.originalLyrics`; `DemoForm.tsx` shows
 an honest "sign up to generate real lyrics" message when `fields.lyrics` is unset. See
@@ -578,4 +580,35 @@ inside `"kpop"`. Fixed with a lookbehind excluding `pop` matches immediately pre
 General lesson: after writing a regex-based extractor, feed it the exact reported input and read
 the raw output — substring-collision false positives between a specific keyword (`kpop`) and a
 more general one (`pop`) don't show up in isolated unit tests unless you test them together.
+
+---
+
+## Spec interpretation feature (ADR-044)
+
+### Local Docker Postgres role password had silently drifted from `.env.local`
+
+**Symptom:** While live-verifying the new spec-interpreter feature, signup started failing with
+`P1000: Authentication failed against the database server, the provided database credentials for
+"postgres" are not valid` — even though `.env.local`'s `DATABASE_URL` and `docker-compose.yml`'s
+`POSTGRES_PASSWORD` both said `postgres`, matching each other exactly.
+
+**Cause:** `docker exec ... psql` (which authenticates locally inside the container, not over the
+password-checked TCP path) worked fine, but a fresh `docker run --network host ... psql -h
+127.0.0.1` with `PGPASSWORD=postgres` failed with a genuine password rejection — proving the
+container's actual role password no longer matched what both config files said. Postgres only
+applies `POSTGRES_PASSWORD` when a data volume is first initialized; if the persistent volume
+(`music-prompt-architect-starter_postgres-data`) was created earlier with a different password
+(e.g. during the exact placeholder-mismatch episode already documented above) and never wiped, the
+container keeps using that original baked-in password forever, regardless of later
+`docker-compose.yml` edits — the config file and the running database silently disagree.
+
+**Fix:** Not a code change. Reset the password from inside the already-authenticated container
+(`docker exec ... psql -U postgres -c "ALTER USER postgres WITH PASSWORD 'postgres';"`) — zero data
+loss, confirmed by checking row counts (23 users / 22 projects / 47 prompt packages) before and
+after. Deliberately chose this over `docker compose down -v && up -d` (which would have fixed it
+too, but by deleting every local user/project accumulated across this whole session's prior live
+verifications) — the reversible, data-preserving fix was available and used instead of the
+destructive one. General lesson: if `docker exec` auth works but external TCP auth with the
+"correct" password fails, suspect a stale password baked into an old volume before suspecting the
+config files — they can look correct and still not match the live database.
 

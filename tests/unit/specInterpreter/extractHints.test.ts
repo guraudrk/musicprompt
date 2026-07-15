@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractHints } from "@/app/api/demo/compile/extractHints";
+import { extractHints } from "@/domain/songDesignSpec/extractHints";
 
 describe("extractHints (deterministic keyword matching, not AI/classification)", () => {
   it("extracts Korean genre/tempo/vocal keywords", () => {

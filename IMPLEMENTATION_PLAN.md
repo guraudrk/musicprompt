@@ -636,8 +636,28 @@ Each requires official capability verification and tests.
     professional-practice phrasing. 137 unit tests (up from 129); live-verified against the running
     dev server with the user's exact reported input, which also caught and fixed a substring-
     collision bug (`"kpop"` double-matching the generic `"pop"` keyword).
-17. **Next actual work**: translating `/dashboard` and the `ProjectEditor` form (the deferred i18n
-    scope from this slice) is now a real, sizeable candidate; the rest of Phase 7 (Sound Seed Orb,
+17. ~~Add AI-assisted spec interpretation: free-text North Star → structured `musicalIdentity`/
+    `lyricsDesign.mode` suggestions.~~ Done — ADR-044. The user's core objection: the product's
+    reason to exist is that a vague/messy idea should still produce a well-formed structured
+    result via the theory engines + Gemini — investigation confirmed this did not exist yet in the
+    real (authenticated) flow; `ProjectEditor.tsx` required every field typed manually, and Gemini
+    only ever compiled an already-complete spec, never inferred one. Added `SpecInterpreter`
+    (`src/spec-interpreter/`), mirroring `LyricsDraftGenerator`'s exact Mock/Gemini pattern:
+    `POST /api/projects/{id}/spec/interpret` (not persisted, same suggest-then-PATCH pattern as
+    lyrics drafts/theory warnings), a new "Suggest style from North Star (AI)" button + suggestions
+    panel (confidence + rationale per field, Apply/Discard) in `ProjectEditor.tsx`, and a
+    deterministic `validateInterpretation()` backstop (never overrides an already-set field, drops
+    any suggestion missing a `fieldProvenance` entry). Scope this slice: `musicalIdentity` +
+    `lyricsDesign.mode` only (structure/emotionCurve/contrastPlan/hookPlan/compositionTheory
+    inference is a known, larger follow-up). 149 unit tests (up from 137); live-verified twice
+    against the running dev server — Mock-forced (honestly returns no suggestions for genuinely
+    vague input) and real Gemini (a vague Korean North Star produced specific, well-reasoned
+    Ballad/slow-tempo/acoustic-instrumentation/sorrowful-vocal suggestions with per-field
+    confidence) — the concrete proof of "개떡같이 입력해도 찰떡같이 나온다."
+18. **Next actual work**: the larger structure/emotionCurve/contrastPlan/hookPlan inference
+    follow-up to item 17 is now a real, well-scoped candidate; translating `/dashboard` and the
+    `ProjectEditor` form (the deferred i18n scope from the language-switcher slice) is also a real,
+    sizeable candidate; the rest of Phase 7 (Sound Seed Orb,
     provider selector, Lab preview, app section, Lighthouse baseline) remains open; other
     candidates are Phase 6 (Revision Lab), the full 8/14-screen wizard (PRODUCT_SPEC §16),
     `contrastPlan`/`hookPlan`/`repetitionPlan` UI, the lock-field UI for

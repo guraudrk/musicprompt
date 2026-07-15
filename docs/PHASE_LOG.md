@@ -1115,3 +1115,96 @@ removal).
 
 - Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first-sixth slices is still
   pending.
+
+---
+
+## Spec interpretation feature (2026-07-15) — "vague idea in → structured spec out" (ADR-044)
+
+### 한글 요약
+
+- **왜 만들었나**: 데모 버그를 고친 뒤, 사용자가 진짜 핵심을 짚었습니다 — "개떡같이 입력해도
+  찰떡같이 나오는 게 가장 중요한데, 그게 안 되면 이 프로젝트를 하는 의미 자체가 없다." 조사해보니
+  실제로 로그인 후 진짜 프로젝트 편집기에서는 이 기능이 아예 없었습니다: `ProjectEditor.tsx`는
+  장르·템포·악기 구성을 전부 사용자가 직접 입력창에 타이핑해야 했고, Gemini는 이미 완성된 스펙을
+  다듬기만 할 뿐, 모호한 문장에서 음악적 스타일을 추론해주는 단계가 코드 어디에도 없었습니다.
+- **무엇을 만들었나**: `src/spec-interpreter/`라는 새 모듈을 만들어, 이미 저장된 North Star
+  텍스트에서 장르·템포·악기 구성·보컬 묘사·가사 모드를 제안하는 기능을 추가했습니다. 기존
+  가사 초안 생성 기능(`LyricsDraftGenerator`)과 완전히 동일한 Mock/Gemini 이중 구현 패턴을
+  그대로 재사용했습니다. 프로젝트 편집기에 "Suggest style from North Star (AI)" 버튼을 추가하면,
+  각 제안 항목마다 신뢰도(high/low confidence)와 한 줄 근거가 함께 표시되고, 사용자가 검토한 뒤
+  "Apply suggestions"(적용) 또는 "Discard"(취소)를 선택할 수 있습니다. 적용해도 자동 저장은 되지
+  않고, 기존 Save 버튼을 눌러야 최종 반영됩니다.
+- **안전장치**: 이미 사용자가 직접 채운 필드는 절대 덮어쓰지 않도록 `validateInterpretation.ts`라는
+  결정론적 검증 로직을 따로 만들어서, Gemini든 Mock이든 상관없이 강제 적용했습니다. 근거
+  없는(fieldProvenance가 없는) 제안도 이 단계에서 걸러집니다.
+- **이번 슬라이스의 범위**: 장르·템포·악기·보컬·가사 모드까지만 다뤘고, 구조·감정 곡선·대비 계획·
+  훅 계획 추론은 이번에 포함하지 않았습니다(다음 큰 작업으로 명시). 로그인 없는 데모는 이번
+  변경과 무관합니다 — 여전히 Mock 전용(비-AI)으로 유지됩니다(과금/남용 방지, ADR-036).
+- **라이브 검증**: 실제 실행 중인 서버에 두 번 확인했습니다. (1) Mock 강제 모드에서 진짜로 애매한
+  한국어 문장("기차역에서 헤어지는데 좀 슬프고 여운 남게")을 넣었더니 정직하게 "확신할 수 있는
+  단서를 찾지 못했다"는 결과가 나왔습니다(추측해서 지어내지 않음을 증명). (2) 실제 Gemini로 같은
+  문장을 넣었더니 발라드/어쿠스틱 팝 장르, 슬로우 템포, 어쿠스틱 기타·피아노·현악 4중주 악기 구성,
+  애절한 보컬 묘사를 각각의 구체적인 근거와 함께 제안했습니다 — 이게 바로 사용자가 요청한
+  "개떡같이 입력해도 찰떡같이 나온다"의 실제 증거입니다.
+- **부수적으로 발견한 문제**: 라이브 검증 도중 로컬 Docker Postgres의 실제 비밀번호가
+  `.env.local`/`docker-compose.yml`과 어긋나 있는 걸 발견했습니다(과거에 볼륨이 다른 비밀번호로
+  초기화된 뒤 설정 파일만 바뀐 것으로 추정). 볼륨을 통째로 밀어버리는 대신, 컨테이너 안에서
+  `ALTER USER` 명령으로 비밀번호만 맞춰서 기존 사용자 23명·프로젝트 22개·컴파일 결과 47개를
+  전혀 잃지 않고 해결했습니다.
+
+### What shipped
+
+- `src/domain/songDesignSpec/interpretation.ts` (new) — `SpecInterpretationSchema`, the first real
+  consumer of the previously-unused `FieldProvenance` type (`src/domain/provenance.ts`).
+- `src/spec-interpreter/{types,mockSpecInterpreter,geminiSpecInterpreter,validateInterpretation}.ts`
+  (new) — mirrors `src/lyrics/*`'s exact Mock/Gemini dual-implementation pattern.
+- `src/llm/gemini/prompts/spec-interpret.system.md` (new) — hard constraints: never invent a fact
+  the text doesn't imply, never suggest a value for an already-set field, every suggestion must
+  carry an honest confidence tag, no guaranteed-quality claims.
+- `src/llm/mock/specInterpretationBuilder.ts` (new) — deterministic Mock backend, reusing the
+  keyword extractor now relocated to `src/domain/songDesignSpec/extractHints.ts` (shared with the
+  demo route from the earlier bug-fix slice).
+- `src/lib/specInterpreterDeps.ts` (new) + a new `wrapSpecInterpreterWithDevFallback` in
+  `src/llm/devFallback.ts` — same Gemini-when-configured/dev-fallback wiring as every other
+  capability.
+- `src/app/api/projects/[projectId]/spec/interpret/route.ts` (new) — not persisted; same
+  suggest-then-apply-via-existing-PATCH pattern as lyrics drafts and theory warnings.
+- `ProjectEditor.tsx` — new state/handlers (`interpretation`/`interpreting`/`interpretError`,
+  `handleInterpretSpec`/`handleApplyInterpretation`/`handleDiscardInterpretation`), a new button and
+  suggestions panel, and a new `vocalDescription` form field (the schema already had this field;
+  no input ever exposed it before this slice).
+- `tests/unit/specInterpreter/{mockSpecInterpreter,validateInterpretation,extractHints}.test.ts` +
+  `tests/unit/apiSpecInterpretRoute.test.ts` (new). 149 unit tests total (up from 137).
+
+### Live verification
+
+- **Mock-forced** (temporarily stopped the real dev server, restarted with `GEMINI_API_KEY`/
+  `GEMINI_MODEL`/`GEMINI_API_MODE` blanked, same technique as the Phase 7 fifth-slice history
+  verification): signed up, created a project, saved a deliberately vague Korean North Star with no
+  recognizable keywords, clicked "Suggest style from North Star (AI)" — got an honest "no confident
+  suggestions" result, proving the Mock backend never guesses.
+- **Real Gemini** (restarted the dev server with the real key restored): same flow, same input —
+  produced `Ballad, Acoustic Pop` / `Slow-tempo` / `Acoustic Guitar, Piano, String Quartet` / a
+  sorrowful vocal description, each with a specific rationale tied to the actual text and an honest
+  confidence tag (genre: high confidence; tempo/instrumentation/vocal: low confidence). Applied the
+  suggestions, confirmed the form fields updated, saved successfully.
+- Screenshot of the suggestions panel reviewed (readable, correctly labeled, Apply/Discard both
+  present).
+
+### Verification at time of this entry
+
+- `pnpm typecheck`, `pnpm lint`, `pnpm build` — pass
+- `pnpm test` — 149/149 pass (up from 137)
+- Live walkthrough (Mock-forced + real Gemini) against the running dev server — pass (see above)
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-044 (spec interpretation feature, scope, and the disclosed
+"direct is both default and a valid choice" ambiguity limitation).
+
+### Known gaps carried forward
+
+- Structure/emotionCurve/contrastPlan/hookPlan/compositionTheory inference — explicitly out of
+  scope for this slice, a real candidate for the next one.
+- Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first-sixth slices is still
+  pending.

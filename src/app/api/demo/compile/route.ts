@@ -5,7 +5,7 @@ import { InMemoryProviderRegistry } from "@/providers/registry";
 import { MockPromptCompiler } from "@/llm/mock/mockPromptCompiler";
 import { MockPromptEvaluator } from "@/llm/mock/mockPromptEvaluator";
 import { buildDefaultSpec } from "@/domain/songDesignSpec/defaultSpec";
-import { extractHints } from "./extractHints";
+import { extractHints } from "@/domain/songDesignSpec/extractHints";
 
 /**
  * Anonymous, no-login demo of the compile pipeline for the landing page. Deliberately isolated

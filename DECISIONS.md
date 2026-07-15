@@ -1102,6 +1102,103 @@ user-facing copy.
 
 ---
 
+## ADR-044 — AI-assisted spec interpretation: free-text North Star → structured `musicalIdentity`/`lyricsDesign.mode` suggestions
+
+- Status: Accepted
+- Date: 2026-07-15
+
+### Decision
+
+The user's real objection (prompted by the demo bug fixed in ADR-042) was: this product's entire
+reason to exist is that a vaguely/messily written idea ("개떡같이") should still produce a
+well-formed, structured result ("찰떡같이"), via the theory engines and Gemini this project has
+built. Investigation confirmed **this capability did not exist** in the real, authenticated
+project flow — `ProjectEditor.tsx` required every `musicalIdentity` field to be typed manually into
+its own plain input; `src/compiler/pipeline.ts` explicitly assumes normalization already happened
+and never infers anything from free text; Gemini's existing role is strictly to compile an
+already-fully-specified spec, never to interpret vague prose into one (`docs/PRODUCT_SPEC.md §9.1`:
+"Do not ask Gemini to invent the entire system from an unstructured paragraph"). The
+`provenance: FieldProvenance[]` field (`src/domain/provenance.ts`) existed in the schema, unused,
+as a ready-made hook for exactly this.
+
+Added a new capability, `SpecInterpreter` (`src/spec-interpreter/`), that infers
+`musicalIdentity.genres/tempoDescription/instrumentation/vocalDescription` and
+`lyricsDesign.mode` from the project's already-saved North Star text, mirroring the existing
+`LyricsDraftGenerator` Mock/Gemini dual-implementation pattern exactly (same `LLMProvider`,
+`generateStructured`, dev-fallback wiring, `MOCK_TASK` registration) rather than inventing new
+architecture:
+
+- `src/domain/songDesignSpec/interpretation.ts` — `SpecInterpretationSchema`, reusing
+  `FieldProvenanceSchema` (its first real consumer).
+- `src/spec-interpreter/{types,mockSpecInterpreter,geminiSpecInterpreter,validateInterpretation}.ts`
+  + `src/llm/gemini/prompts/spec-interpret.system.md` + `src/llm/mock/specInterpretationBuilder.ts`
+  (reuses/relocates the keyword extractor from ADR-042, now shared at
+  `src/domain/songDesignSpec/extractHints.ts` since both the demo and the Mock interpreter need it).
+- `POST /api/projects/{id}/spec/interpret` (new) — same not-persisted,
+  read-only-suggestion-then-PATCH-via-existing-endpoint pattern as lyrics drafts and theory
+  warnings. Requires the North Star to already be saved before requesting suggestions, matching the
+  existing `Analyze`/`Generate Drafts` precedent (confirmed with the user rather than assumed —
+  see the plan file's `AskUserQuestion` — friction is deliberate consistency, not an oversight).
+- `ProjectEditor.tsx` — new "Suggest style from North Star (AI)" button, a suggestions panel
+  showing each field's confidence + a one-line rationale, and **Apply**/**Discard**. Apply only
+  updates local form state (genresText/tempoDescription/instrumentationText/vocalDescription/
+  lyricsMode) — it does not auto-save; the user still reviews and hits the existing Save button.
+  Also added a `vocalDescription` input to the Musical Identity section, since the schema already
+  had this field but no form control ever exposed it.
+- `validateInterpretation.ts` is the deterministic backstop (mirrors
+  `src/lyrics/validateDraftSet.ts`): drops any suggested field that either collides with a
+  non-default value already in the spec, or lacks a matching `fieldProvenance` entry — enforced in
+  code, not left to prompt-instruction hope, for both Mock and Gemini output equally.
+
+**Scope of this slice**: `musicalIdentity` + `lyricsDesign.mode` only — exactly the fields the
+user's bug report was about. Structure/emotionCurve/contrastPlan/hookPlan/compositionTheory
+inference is explicitly out of scope, a known gap for a larger follow-up slice, not silently
+dropped. The anonymous demo is unaffected — it stays Mock-only/keyword-based per the existing
+no-rate-limiting safety guardrail (ADR-036); this feature only runs for authenticated, owned
+projects where real Gemini calls are already allowed and billed.
+
+**Known limitation, disclosed rather than silently accepted**: `lyricsDesign.mode`'s default value
+(`"direct"`) is indistinguishable from a user's deliberate choice of `"direct"` — the validator
+cannot tell "never touched, still default" from "confirmed, wants direct lyrics." The same
+ambiguity already existed for `musicalIdentity.genres`/`instrumentation` (empty array) before this
+slice; it is accepted here for the same reason (CLAUDE.md §3: direct/simple is a complete option,
+not a fallback, so treating it as "still open to suggestion" is a reasonable default, not a
+downgrade).
+
+### Reason
+
+This is a material extension beyond `docs/PRODUCT_SPEC.md`'s original design, recorded per
+CLAUDE.md §2 rather than silently added: PRODUCT_SPEC's pipeline (§9.2) assumed a guided,
+multi-screen wizard (Theme → Ideation → ... ) populates these fields through explicit user
+decisions, not single-paragraph inference. This ADR adds a genuinely new entry point — infer a
+draft, let the user review/edit on the existing structured fields — because the guided-wizard UI
+does not exist yet (`ProjectEditor.tsx` is still one dense page, per ADR-034) and the user judged
+this capability non-negotiable for the product's value proposition, not merely a nice-to-have.
+
+### Verification
+
+Live-verified against the running dev server, twice:
+
+1. **Mock-forced** (`GEMINI_API_KEY`/`GEMINI_MODEL`/`GEMINI_API_MODE` blanked): a deliberately vague
+   Korean North Star with no recognizable keywords ("기차역에서 헤어지는데 좀 슬프고 여운 남게")
+   correctly produced **no suggestions** and an honest "no confident cues found" message — proving
+   the Mock backend never guesses.
+2. **Real Gemini**, same input: produced high/low-confidence suggestions — Ballad/Acoustic Pop
+   genre, slow-tempo, acoustic guitar/piano/string-quartet instrumentation, a sorrowful vocal
+   description, each with a specific one-line rationale tied to the actual text ("a poignant scene
+   of parting at a train station with a deeply lingering, sad emotional aftermath..."). This is the
+   concrete demonstration of "개떡같이 입력해도 찰떡같이 나온다" the user asked for.
+
+Also found and fixed during setup (unrelated to this feature's code): the local Docker Postgres
+container's actual role password had drifted from `.env.local`/`docker-compose.yml`'s
+`postgres:postgres` (likely baked into the persistent volume from an earlier session, per the
+existing `docs/TROUBLESHOOTING.md` entry on this exact class of bug) — fixed with `ALTER USER
+postgres WITH PASSWORD 'postgres'` inside the running container, preserving all 23
+users/22 projects/47 prompt packages already in the local dev database rather than recreating the
+volume.
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:

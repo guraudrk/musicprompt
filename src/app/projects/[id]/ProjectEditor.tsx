@@ -7,6 +7,7 @@ import type { LyricsMode } from "@/domain/songDesignSpec/lyrics";
 import type { MusicAIPromptPackage } from "@/domain/promptPackage/schema";
 import type { CompositionTheorySpec } from "@/domain/songDesignSpec/theory";
 import type { LyricsDraft } from "@/domain/lyrics/draft";
+import type { SpecInterpretation } from "@/domain/songDesignSpec/interpretation";
 import type { ReferenceTrait, ReferencePrinciple } from "@/domain/songDesignSpec/reference";
 import type { DeliberateDifference, DeliberateDifferenceDimension } from "@/domain/songDesignSpec/difference";
 import { MINIMUM_DELIBERATE_DIFFERENCES } from "@/domain/songDesignSpec/difference";
@@ -83,6 +84,7 @@ export function ProjectEditor({ project }: { project: Project }) {
   const [genresText, setGenresText] = useState(spec.musicalIdentity.genres.map((g) => g.tag).join(", "));
   const [tempoDescription, setTempoDescription] = useState(spec.musicalIdentity.tempoDescription);
   const [instrumentationText, setInstrumentationText] = useState(spec.musicalIdentity.instrumentation.join(", "));
+  const [vocalDescription, setVocalDescription] = useState(spec.musicalIdentity.vocalDescription ?? "");
 
   const [lyricsMode, setLyricsMode] = useState<LyricsMode>(spec.lyricsDesign.mode);
   const [originalLyrics, setOriginalLyrics] = useState(spec.lyricsDesign.originalLyrics ?? "");
@@ -128,6 +130,10 @@ export function ProjectEditor({ project }: { project: Project }) {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
+
+  const [interpretation, setInterpretation] = useState<SpecInterpretation | null>(null);
+  const [interpreting, setInterpreting] = useState(false);
+  const [interpretError, setInterpretError] = useState<string | null>(null);
 
   function addSurfaceTrait() {
     setSurfaceTraits((rows) => [...rows, { id: makeId(), description: "" }]);
@@ -204,6 +210,7 @@ export function ProjectEditor({ project }: { project: Project }) {
         genres: splitList(genresText).map((tag) => ({ tag, weight: 50 })),
         tempoDescription,
         instrumentation: splitList(instrumentationText),
+        vocalDescription: vocalDescription || undefined,
       },
       lyricsDesign: {
         ...base.lyricsDesign,
@@ -311,6 +318,41 @@ export function ProjectEditor({ project }: { project: Project }) {
     const { project: updated } = await response.json();
     setCurrent(updated);
     await handleAnalyze();
+  }
+
+  async function handleInterpretSpec() {
+    setInterpreting(true);
+    setInterpretError(null);
+    setInterpretation(null);
+
+    const response = await fetch(`/api/projects/${project.id}/spec/interpret`, { method: "POST" });
+
+    setInterpreting(false);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: "Spec interpretation failed." }));
+      setInterpretError(body.error ?? "Spec interpretation failed.");
+      return;
+    }
+    const { interpretation: result } = await response.json();
+    setInterpretation(result);
+  }
+
+  function handleApplyInterpretation() {
+    if (!interpretation) return;
+    const { genres, tempoDescription: suggestedTempo, instrumentation, vocalDescription: suggestedVocal } =
+      interpretation.musicalIdentity;
+
+    if (genres && genres.length > 0) setGenresText(genres.map((g) => g.tag).join(", "));
+    if (suggestedTempo) setTempoDescription(suggestedTempo);
+    if (instrumentation && instrumentation.length > 0) setInstrumentationText(instrumentation.join(", "));
+    if (suggestedVocal) setVocalDescription(suggestedVocal);
+    if (interpretation.lyricsDesignMode) setLyricsMode(interpretation.lyricsDesignMode);
+
+    setInterpretation(null);
+  }
+
+  function handleDiscardInterpretation() {
+    setInterpretation(null);
   }
 
   async function handleGenerateDrafts() {
@@ -533,6 +575,10 @@ export function ProjectEditor({ project }: { project: Project }) {
           Instrumentation (comma-separated)
           <input value={instrumentationText} onChange={(e) => setInstrumentationText(e.target.value)} />
         </label>
+        <label>
+          Vocal description
+          <input value={vocalDescription} onChange={(e) => setVocalDescription(e.target.value)} />
+        </label>
       </section>
 
       <section>
@@ -689,6 +735,9 @@ export function ProjectEditor({ project }: { project: Project }) {
         <button onClick={handleAnalyze} disabled={analyzing}>
           {analyzing ? "Analyzing..." : "Analyze (theory check)"}
         </button>
+        <button onClick={handleInterpretSpec} disabled={interpreting}>
+          {interpreting ? "Interpreting..." : "Suggest style from North Star (AI)"}
+        </button>
         <button onClick={handleGenerateDrafts} disabled={drafting}>
           {drafting ? "Drafting..." : "Generate Drafts (A / B / C)"}
         </button>
@@ -702,8 +751,35 @@ export function ProjectEditor({ project }: { project: Project }) {
       {saveError && <p role="alert" style={{ color: "var(--color-warning)" }}>{saveError}</p>}
       {compileError && <p role="alert" style={{ color: "var(--color-warning)" }}>{compileError}</p>}
       {analyzeError && <p role="alert" style={{ color: "var(--color-warning)" }}>{analyzeError}</p>}
+      {interpretError && <p role="alert" style={{ color: "var(--color-warning)" }}>{interpretError}</p>}
       {draftError && <p role="alert" style={{ color: "var(--color-warning)" }}>{draftError}</p>}
       {historyError && <p role="alert" style={{ color: "var(--color-warning)" }}>{historyError}</p>}
+
+      {interpretation && (
+        <section>
+          <h2>AI style suggestions</h2>
+          <p style={{ fontSize: "0.85rem" }}>{interpretation.rationale}</p>
+          {interpretation.fieldProvenance.length > 0 ? (
+            <ul>
+              {interpretation.fieldProvenance.map((entry) => (
+                <li key={entry.fieldPath}>
+                  <strong>AI suggested</strong> ({entry.origin.replace("inferred_", "")} confidence) —{" "}
+                  {entry.fieldPath}
+                  {entry.note ? `: ${entry.note}` : ""}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No confident suggestions this time — try adding more descriptive detail to your North Star.</p>
+          )}
+          {interpretation.fieldProvenance.length > 0 && (
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <button onClick={handleApplyInterpretation}>Apply suggestions</button>
+              <button onClick={handleDiscardInterpretation}>Discard</button>
+            </div>
+          )}
+        </section>
+      )}
 
       {drafts && (
         <section>
