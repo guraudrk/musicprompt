@@ -518,3 +518,28 @@ TypeScript-aware script runner. General lesson: reach for "restart the dev serve
 env vars" before "write a standalone script that reimplements part of the app's import graph" —
 the former reuses infrastructure that already works.
 
+---
+
+## Phase 7 (sixth slice — i18n language switcher)
+
+### Reading the locale cookie in the root layout silently turned every route dynamic
+
+**Symptom:** Not a failure — but comparing `pnpm build` output before and after this slice showed
+`/`, `/login`, and `/signup` changed from `○ (Static)` to `ƒ (Dynamic)`.
+
+**Cause:** `src/app/layout.tsx` now calls `cookies()` from `next/headers` to read the saved locale
+so the correct language renders on the very first paint (no flash of English before hydration
+corrects it). Next.js can't statically prerender any route under a layout that reads
+request-specific data like cookies — the entire app under that layout loses static optimization,
+not just the pages that actually use the locale.
+
+**Not fixed — a disclosed trade-off, not a bug.** The alternative (skip the server-side cookie
+read, default to English for SSR, correct to the saved language client-side after mount) would
+keep static rendering but show a visible flash of English for returning non-English-locale
+visitors — worse UX for a smaller, disclosed performance cost. Recorded in `DECISIONS.md` ADR-041
+rather than silently accepted or silently "fixed" by reverting to the flashing version. General
+lesson: reading `cookies()`/`headers()` anywhere in a layout affects the *entire subtree* under
+it, not just the component that calls it — check `pnpm build`'s route table before/after adding
+either, since the regression is easy to miss (no error, no test failure, just a quieter
+route-table symbol).
+

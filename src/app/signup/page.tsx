@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import styles from "../AuthForm.module.css";
 import { HeroBackground } from "../HeroBackground";
+import { useDictionary } from "../LocaleProvider";
 
 export default function SignupPage() {
+  const dict = useDictionary();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,8 +27,8 @@ export default function SignupPage() {
     });
 
     if (!response.ok) {
-      const body = await response.json().catch(() => ({ error: "Sign up failed." }));
-      setError(body.error ?? "Sign up failed.");
+      const body = await response.json().catch(() => ({ error: dict.auth.signup.genericError }));
+      setError(body.error ?? dict.auth.signup.genericError);
       setSubmitting(false);
       return;
     }
@@ -35,7 +37,7 @@ export default function SignupPage() {
     setSubmitting(false);
 
     if (result?.error) {
-      setError("Account created, but automatic login failed. Please log in.");
+      setError(dict.auth.signup.autoLoginFailed);
       router.push("/login");
       return;
     }
@@ -46,10 +48,10 @@ export default function SignupPage() {
     <main className={styles.page}>
       <HeroBackground />
       <div className={styles.card}>
-        <h1 className={styles.heading}>Sign up</h1>
+        <h1 className={styles.heading}>{dict.auth.signup.heading}</h1>
         <form onSubmit={handleSubmit} className={styles.form}>
           <label className={styles.field}>
-            Email
+            {dict.auth.signup.email}
             <input
               className={styles.input}
               type="email"
@@ -59,7 +61,7 @@ export default function SignupPage() {
             />
           </label>
           <label className={styles.field}>
-            Password (min 8 characters)
+            {dict.auth.signup.passwordLabel}
             <input
               className={styles.input}
               type="password"
@@ -75,11 +77,11 @@ export default function SignupPage() {
             </p>
           )}
           <button type="submit" className={styles.submit} disabled={submitting}>
-            {submitting ? "Signing up..." : "Sign up"}
+            {submitting ? dict.auth.signup.submitting : dict.auth.signup.submit}
           </button>
         </form>
         <p className={styles.switchLink}>
-          Already have an account? <a href="/login">Log in</a>
+          {dict.auth.signup.alreadyHaveAccount} <a href="/login">{dict.auth.signup.logInLink}</a>
         </p>
       </div>
     </main>

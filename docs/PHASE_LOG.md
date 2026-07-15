@@ -962,3 +962,82 @@ new sourced Craft card).
   baseline) is still open.
 - Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first-fourth slices is still
   pending.
+
+---
+
+## Phase 7 (sixth slice) — English/Korean/Japanese language switcher
+
+- Date: 2026-07-15
+- Status: **DONE (first-slice scope), live-verified**
+
+### 한글 요약
+
+- **무엇을 만들었나**: 사용자가 요청한 그대로 — 우측 최상단, 고정 위치, E(영어)/한(한국어)/日(일본어)
+  순서의 언어 전환 버튼을 만들었습니다. 클릭하면 새로고침 없이 즉시 화면 문구가 바뀌고, 쿠키에
+  저장되어 다음에 다시 방문해도 그대로 유지됩니다.
+- **범위는 랜딩 페이지 + 로그인/회원가입까지만**: 대시보드와 프로젝트 편집기(수십 개의 입력 필드가
+  있는 거대한 폼)는 이번에 번역하지 않았습니다. 그 정도 분량을 제대로 번역하는 건 그 자체로 하나의
+  큰 작업이라, 조용히 빼먹은 게 아니라 "아직 안 한 것"으로 명시해뒀습니다.
+- **URL 방식이 아니라 쿠키 방식을 선택**: `/ko/...`, `/ja/...` 같은 언어별 주소를 만드는 대신, 쿠키에
+  현재 언어를 저장하고 리액트 상태로 화면을 바꾸는 더 가벼운 방식을 택했습니다. `next-intl` 같은
+  라이브러리를 새로 설치하고 라우팅 구조를 바꾸는 건 기존 모든 경로/테스트에 영향을 줄 수 있어서,
+  이번 규모에는 과한 선택이라고 판단했습니다. 대신 언어별로 공유 가능한 URL이 없고 SEO에 불리하다는
+  단점은 그대로 남습니다 — 나중에 필요해지면 URL 방식으로 옮길 수 있습니다.
+- **실제로 발견한 트레이드오프**: 서버에서 쿠키를 읽어 첫 렌더링부터 올바른 언어로 보여주려고
+  `layout.tsx`에서 `cookies()`를 호출했는데, 이렇게 하면 Next.js가 해당 경로 전체를 "정적"이 아니라
+  "동적"으로 렌더링하게 됩니다. 실제로 `pnpm build` 결과를 보면 `/`, `/login`, `/signup`이 전부
+  ○(정적)에서 ƒ(동적)로 바뀐 걸 확인했습니다 — 숨기지 않고 그대로 기록해둡니다. 언어가 깜빡이며
+  바뀌는 걸 감수하고 정적 렌더링을 유지하는 대안도 있었지만, 이번엔 "깜빡임 없이 바로 맞는 언어로
+  보이는 것"을 택했습니다.
+- **번역 품질**: 그냥 기계적으로 옮긴 게 아니라, 이 프로젝트의 실제 톤(통통 튀는 느낌, Craft 섹션의
+  진솔한 문구)을 살리면서 자연스러운 한국어·일본어 문장으로 다시 썼습니다. `SongDesignSpec`,
+  Safe/Balanced/Bold, Suno/Udio, A/B/C 같은 기술·제품 용어는 실제 로컬라이제이션 관행대로 원문 그대로
+  유지했습니다.
+
+### What shipped
+
+- `src/i18n/locale.ts`, `src/i18n/dictionaries/{types,en,ko,ja,index}.ts` (new) — a `Dictionary`
+  interface every locale must fully satisfy (missing key = compile error, not silent fallback).
+- `src/app/LocaleProvider.tsx` (new) — cookie-persisted Context + `useLocale()`/`useDictionary()`.
+- `src/app/LanguageSwitcher.tsx`/`.module.css` (new) — fixed top-right, E/한/日, active state
+  highlighted with the existing crimson→gold gradient.
+- `src/app/layout.tsx` — now an async Server Component reading the `locale` cookie via
+  `next/headers` `cookies()`, seeding `LocaleProvider`'s initial state (no flash of English).
+- `Hero.tsx`/`Problem.tsx`/`Service.tsx`/`Craft.tsx` gained `"use client"` (needed to read the
+  locale Context); `DemoForm.tsx`/`login/page.tsx`/`signup/page.tsx` (already client) wired to
+  `useDictionary()`.
+- `tests/unit/i18n.test.ts` (new) — every locale has exactly the same key set as English; no
+  dictionary value is an empty string. 129 unit tests total (up from 127).
+- `tests/e2e/landing.spec.ts` — new case: switching to 한/日 changes the headline, persists across
+  a reload, and switching back to English restores it.
+
+### Live verification
+
+- Screenshots of the hero, Problem, and Craft sections in Korean, the hero in Japanese, and the
+  Japanese login page — all render correctly with no overflow or layout breakage from longer
+  CJK strings, at both desktop and 375px mobile width.
+- Playwright confirmed the locale persists across a page reload (cookie round-trip) and that all
+  existing English-language assertions in `landing.spec.ts` still pass unchanged (default locale
+  stays English for a fresh visitor with no cookie).
+
+### Verification at time of this entry
+
+- `pnpm typecheck`, `pnpm lint`, `pnpm build` — pass (build output confirms the static→dynamic
+  rendering change noted above)
+- `pnpm test` — 129/129 pass (up from 127)
+- `pnpm exec playwright test tests/e2e/landing.spec.ts` — 6/6 pass
+- Live walkthrough — pass (see above)
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-041 (cookie-based locale approach, scope, and the static-rendering
+trade-off).
+
+### Known gaps carried forward
+
+- `/dashboard` and the `ProjectEditor` form remain English-only regardless of the switcher — a
+  real, sizeable translation slice of its own, not started yet.
+- URL-based per-language routing/SEO — not implemented; cookie-based state was chosen instead (see
+  ADR-041's trade-off).
+- Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first-fifth slices is still
+  pending.

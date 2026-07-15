@@ -1,40 +1,33 @@
+"use client";
+
 import type { CSSProperties } from "react";
 import styles from "./Service.module.css";
 import { Reveal } from "./Reveal";
+import { useDictionary } from "./LocaleProvider";
 
-const CARDS = [
-  {
-    emoji: "🎛️",
-    accent: "var(--color-accent-primary)",
-    outcome: "Compare three directions before you spend a generation",
-    detail:
-      "Every project compiles into Safe, Balanced, and Bold prompt packages in parallel — from the safest interpretation to the boldest creative swing — so the choice happens before you commit, not after.",
-  },
-  {
-    emoji: "📐",
-    accent: "var(--color-accent-secondary)",
-    outcome: "Composition theory, checked automatically",
-    detail:
-      "Seven engines — form, melody, harmony, rhythm, prosody, arrangement, subtraction — check every project and surface warnings you can dismiss or lock in place, so issues surface before generation instead of after a wasted take.",
-  },
-  {
-    emoji: "✍️",
-    accent: "var(--color-lyrics)",
-    outcome: "Three lyric drafts, your locked lines untouched",
-    detail:
-      "Generate A/B/C lyric drafts in direct, metaphorical, or hybrid style. Whatever techniques you selected are the only ones that appear, and any line you lock survives every draft, compile, and revision verbatim.",
-  },
+const CARD_META = [
+  { emoji: "🎛️", accent: "var(--color-accent-primary)" },
+  { emoji: "📐", accent: "var(--color-accent-secondary)" },
+  { emoji: "✍️", accent: "var(--color-lyrics)" },
 ] as const;
 
 export function Service() {
+  const dict = useDictionary();
+
+  const cards = [
+    { outcome: dict.service.card1Outcome, detail: dict.service.card1Detail, ...CARD_META[0] },
+    { outcome: dict.service.card2Outcome, detail: dict.service.card2Detail, ...CARD_META[1] },
+    { outcome: dict.service.card3Outcome, detail: dict.service.card3Detail, ...CARD_META[2] },
+  ];
+
   return (
     <section className={styles.section}>
       <div className={styles.inner}>
         <Reveal>
-          <h2 className={styles.heading}>What actually happens between your idea and the prompt ⚡</h2>
+          <h2 className={styles.heading}>{dict.service.heading}</h2>
         </Reveal>
         <div className={styles.grid}>
-          {CARDS.map((card, i) => (
+          {cards.map((card, i) => (
             <Reveal key={card.outcome} delayMs={i * 100}>
               <div className={styles.card} style={{ "--accent": card.accent } as CSSProperties}>
                 <span className={styles.cardEmoji}>{card.emoji}</span>

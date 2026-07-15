@@ -58,3 +58,20 @@ test("landing page lets a visitor generate a prompt without logging in", async (
   await expect(page.getByText(/Style:/)).toBeVisible();
   await expect(page.getByText(/Lyrics:/)).toBeVisible();
 });
+
+test("language switcher changes copy and persists across reload", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /One idea/ })).toBeVisible();
+
+  await page.getByRole("button", { name: "한국어" }).click();
+  await expect(page.getByRole("heading", { name: /하나의 아이디어/ })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: /하나의 아이디어/ })).toBeVisible();
+
+  await page.getByRole("button", { name: "日本語" }).click();
+  await expect(page.getByRole("heading", { name: /ひとつのアイデアを/ })).toBeVisible();
+
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(page.getByRole("heading", { name: /One idea/ })).toBeVisible();
+});

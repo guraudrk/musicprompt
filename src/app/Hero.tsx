@@ -1,30 +1,32 @@
+"use client";
+
 import Link from "next/link";
 import styles from "./Hero.module.css";
 import { ScrollHint } from "./ScrollHint";
 import { HeroBackground } from "./HeroBackground";
 import { DemoForm } from "./DemoForm";
+import { useDictionary } from "./LocaleProvider";
 
 export function Hero() {
+  const dict = useDictionary();
+
   return (
     <section className={styles.hero}>
       <HeroBackground />
       <div className={styles.heroContent}>
         <h1 className={styles.headline}>
-          One idea.
+          {dict.hero.headlineLine1}
           <br />
-          Every music AI.
+          {dict.hero.headlineLine2}
         </h1>
-        <p className={styles.heroDescription}>
-          Suno and Udio each want the idea described differently. Type yours below and see a real
-          compiled result right now — no signup needed.
-        </p>
+        <p className={styles.heroDescription}>{dict.hero.description}</p>
 
         <DemoForm />
 
         <div className={styles.authLinks}>
-          <Link href="/signup">Sign up</Link>
+          <Link href="/signup">{dict.hero.signUp}</Link>
           <span aria-hidden="true">·</span>
-          <Link href="/login">Log in</Link>
+          <Link href="/login">{dict.hero.logIn}</Link>
         </div>
 
         <ScrollHint />

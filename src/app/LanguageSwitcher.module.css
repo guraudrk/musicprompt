@@ -1,0 +1,51 @@
+.switcher {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 100;
+  display: flex;
+  gap: 0.375rem;
+  padding: 0.25rem;
+  border-radius: 1.25rem;
+  background: rgba(5, 6, 10, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(6px);
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.button:hover {
+  color: #ffffff;
+}
+
+.buttonActive {
+  background: linear-gradient(90deg, var(--color-accent-crimson) 0%, var(--color-accent-gold) 100%);
+  color: #ffffff;
+}
+
+@media screen and (max-width: 640px) {
+  .switcher {
+    top: 0.75rem;
+    right: 0.75rem;
+  }
+
+  .button {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.75rem;
+  }
+}

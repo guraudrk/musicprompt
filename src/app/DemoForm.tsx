@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import type { MusicAIPromptPackage } from "@/domain/promptPackage/schema";
 import styles from "./Hero.module.css";
+import { useDictionary } from "./LocaleProvider";
 
 /**
  * No-login demo: calls the Mock-only /api/demo/compile endpoint (see that route's comment for why
@@ -11,6 +12,7 @@ import styles from "./Hero.module.css";
  * Safe/Balanced/Bold variants, and saving a project — this is a taste, not a replacement.
  */
 export function DemoForm() {
+  const dict = useDictionary();
   const [idea, setIdea] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,8 +31,8 @@ export function DemoForm() {
 
     setLoading(false);
     if (!response.ok) {
-      const body = await response.json().catch(() => ({ error: "Generation failed." }));
-      setError(body.error ?? "Generation failed.");
+      const body = await response.json().catch(() => ({ error: dict.demoForm.genericError }));
+      setError(body.error ?? dict.demoForm.genericError);
       return;
     }
     const { package: pkg } = await response.json();
@@ -40,7 +42,7 @@ export function DemoForm() {
   return (
     <div className={styles.demoForm}>
       <label className={styles.demoLabel} htmlFor="demo-idea">
-        Describe your musical idea — no signup needed
+        {dict.demoForm.label}
       </label>
       <textarea
         id="demo-idea"
@@ -48,10 +50,10 @@ export function DemoForm() {
         rows={3}
         value={idea}
         onChange={(e) => setIdea(e.target.value)}
-        placeholder="e.g. A bittersweet farewell at a train station, warm indie-pop, mid-tempo"
+        placeholder={dict.demoForm.placeholder}
       />
       <button className={styles.demoButton} onClick={handleGenerate} disabled={loading || idea.trim().length === 0}>
-        {loading ? "Generating..." : "Generate"}
+        {loading ? dict.demoForm.generating : dict.demoForm.generate}
       </button>
 
       {error && (
@@ -63,14 +65,13 @@ export function DemoForm() {
       {result && (
         <div className={styles.demoResult}>
           <p>
-            <strong>Style:</strong> {result.fields.style}
+            <strong>{dict.demoForm.style}</strong> {result.fields.style}
           </p>
           <p>
-            <strong>Lyrics:</strong> {result.fields.lyrics}
+            <strong>{dict.demoForm.lyrics}</strong> {result.fields.lyrics}
           </p>
           <p className={styles.demoUpsell}>
-            <Link href="/signup">Sign up</Link> to save this project and unlock Safe / Balanced /
-            Bold with real Gemini output.
+            <Link href="/signup">{dict.demoForm.signUpLink}</Link> {dict.demoForm.upsellSuffix}
           </p>
         </div>
       )}

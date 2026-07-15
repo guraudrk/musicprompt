@@ -972,6 +972,59 @@ keeps the palette coherent instead of introducing a competing color scheme.
 
 ---
 
+## ADR-041 — English/Korean/Japanese switcher: cookie-persisted client state, not URL-based locale routing
+
+- Status: Accepted
+- Date: 2026-07-15
+
+### Decision
+
+Added a language switcher (top-right, fixed position, order E / 한 / 日 exactly as specified) that
+translates the landing page (`Hero`/`Problem`/`Service`/`Craft`/`DemoForm`) and `/login`/`/signup`
+between English, Korean, and Japanese. **Scope is deliberately limited to these pages** — the
+dashboard and the `ProjectEditor` form (dozens of field labels — the app's actual working surface)
+are not translated this round; translating that form well is a separate, larger slice and is
+tracked as a known gap, not silently skipped.
+
+**Architecture: a `locale` cookie + React Context (`src/app/LocaleProvider.tsx`), not URL-based
+locale routing** (no `next-intl`, no `/ko/...`/`/ja/...` paths). No i18n library was installed
+before this; adding one means routing/middleware changes touching every existing route. A cookie +
+Context is far smaller in scope and keeps every existing URL/test unchanged.
+
+- `src/i18n/locale.ts` — `Locale = "en"|"ko"|"ja"`, cookie name, `isLocale()` guard.
+- `src/i18n/dictionaries/types.ts` — a `Dictionary` interface every locale must fully satisfy, so
+  a missing translation key is a **compile error**, not a silent runtime fallback to English.
+  `src/i18n/dictionaries/{en,ko,ja}.ts` hold the actual copy; technical/product terms
+  (`SongDesignSpec`, Safe/Balanced/Bold, Suno/Udio, A/B/C, Gemini) are kept in their original form
+  in all three locales — standard localization practice for technical product terms, not an
+  oversight.
+- `src/app/layout.tsx` (now an async Server Component) reads the cookie via `next/headers`
+  `cookies()` and seeds `LocaleProvider`'s initial state — this avoids a flash of English before
+  hydration corrects it, at a real, disclosed cost (see Consequence below).
+- `Hero`/`Problem`/`Service`/`Craft` gained `"use client"` (they were static-copy Server Components
+  before; reading the locale Context requires being a Client Component). `DemoForm`/login/signup
+  were already client components.
+
+### Reason
+
+The switcher's exact visual spec (position, order, single-letter labels) was fully specified by the
+user; the persistence/routing mechanism was not, so a reasonable low-risk default was chosen and is
+recorded here rather than asked about — this is a UI/engineering judgment call, not a security or
+destructive one.
+
+### Consequence (real, disclosed trade-off — not a bug)
+
+Reading `cookies()` in the root layout makes **every route dynamic** — confirmed via `pnpm build`:
+`/`, `/login`, `/signup` changed from `○ (Static)` to `ƒ (Dynamic)` compared to the pre-i18n build.
+This is the accepted cost of correct-language-on-first-paint (no flash) via a server-side cookie
+read; the alternative (client-only correction after mount) would keep static rendering but show a
+brief flash of English for returning non-English-locale visitors. Chose no-flash correctness over
+static-rendering optimization for this size of app. Also loses per-language shareable URLs/SEO,
+same trade-off already named when this was first proposed — acceptable for this slice, revisit
+with URL-based routing if either becomes a real requirement.
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:

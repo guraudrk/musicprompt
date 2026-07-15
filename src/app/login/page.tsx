@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import styles from "../AuthForm.module.css";
 import { HeroBackground } from "../HeroBackground";
+import { useDictionary } from "../LocaleProvider";
 
 export default function LoginPage() {
+  const dict = useDictionary();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,7 +24,7 @@ export default function LoginPage() {
 
     setSubmitting(false);
     if (result?.error) {
-      setError("Invalid email or password.");
+      setError(dict.auth.login.invalidCredentials);
       return;
     }
     router.push("/dashboard");
@@ -32,10 +34,10 @@ export default function LoginPage() {
     <main className={styles.page}>
       <HeroBackground />
       <div className={styles.card}>
-        <h1 className={styles.heading}>Log in</h1>
+        <h1 className={styles.heading}>{dict.auth.login.heading}</h1>
         <form onSubmit={handleSubmit} className={styles.form}>
           <label className={styles.field}>
-            Email
+            {dict.auth.login.email}
             <input
               className={styles.input}
               type="email"
@@ -45,7 +47,7 @@ export default function LoginPage() {
             />
           </label>
           <label className={styles.field}>
-            Password
+            {dict.auth.login.password}
             <input
               className={styles.input}
               type="password"
@@ -60,11 +62,11 @@ export default function LoginPage() {
             </p>
           )}
           <button type="submit" className={styles.submit} disabled={submitting}>
-            {submitting ? "Logging in..." : "Log in"}
+            {submitting ? dict.auth.login.submitting : dict.auth.login.submit}
           </button>
         </form>
         <p className={styles.switchLink}>
-          No account? <a href="/signup">Sign up</a>
+          {dict.auth.login.noAccount} <a href="/signup">{dict.auth.login.signUpLink}</a>
         </p>
       </div>
     </main>

@@ -614,11 +614,22 @@ Each requires official capability verification and tests.
     honestly grounding the theory engines/lyric techniques in the real sources
     `docs/METHODOLOGY.md` already cites (Berklee/USC Thornton/NYU Steinhardt/Juilliard curricula,
     Kim Eana/K-pop lyric-team practice) — not an unverified marketing claim.
-14. **Next actual work**: the rest of Phase 7 (Sound Seed Orb, provider selector, Lab preview, app
-    section, Lighthouse baseline) remains open; other candidates are Phase 6 (Revision Lab), the
-    full 8/14-screen wizard (PRODUCT_SPEC §16), `contrastPlan`/`hookPlan`/`repetitionPlan` UI, the
-    lock-field UI for `compositionTheory.*Notes` (deferred since Phase 4), or project-version
-    history (the alternative not chosen this round — data already exists, UI doesn't). A
+15. ~~Add an English/Korean/Japanese language switcher.~~ Done — ADR-041. Top-right, fixed,
+    order E/한/日 exactly as specified. Cookie-persisted client state (`src/app/LocaleProvider.tsx`),
+    not URL-based locale routing (no `next-intl`, no `/ko`/`/ja` paths) — see ADR-041 for the
+    trade-off, including the real, disclosed cost of `/`/`/login`/`/signup` losing static rendering
+    (confirmed via `pnpm build` output) since `layout.tsx` now reads the locale cookie server-side.
+    Translates the landing page + auth pages only; `Dictionary` interface
+    (`src/i18n/dictionaries/types.ts`) makes a missing translation key a compile error. 129 unit
+    tests (up from 127, new dictionary key-parity test); live-verified all 3 languages at desktop
+    and mobile widths via screenshots, plus persistence across a reload.
+16. **Next actual work**: translating `/dashboard` and the `ProjectEditor` form (the deferred i18n
+    scope from this slice) is now a real, sizeable candidate; the rest of Phase 7 (Sound Seed Orb,
+    provider selector, Lab preview, app section, Lighthouse baseline) remains open; other
+    candidates are Phase 6 (Revision Lab), the full 8/14-screen wizard (PRODUCT_SPEC §16),
+    `contrastPlan`/`hookPlan`/`repetitionPlan` UI, the lock-field UI for
+    `compositionTheory.*Notes` (deferred since Phase 4), or project-version history (the
+    alternative not chosen in the compile-history slice — data already exists, UI doesn't). A
     budget-limit policy decision is still pending before Gemini usage caps can be implemented, and
     real rate limiting is still needed before any anonymous path could ever be allowed to call
     Gemini (see `DECISIONS.md`).
