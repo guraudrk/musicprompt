@@ -878,3 +878,87 @@ See `DECISIONS.md` ADR-038.
   baseline) is still open.
 - Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first/second/third slice is
   still pending.
+
+---
+
+## Phase 7 (fifth slice) — Auth pages restyled + compile history + livelier explanation sections
+
+- Date: 2026-07-15
+- Status: **DONE (first-slice scope), live-verified**
+
+### 한글 요약
+
+- **로그인/회원가입 리디자인**: "Sign up/Log in 페이지 없어도 된다지만 그래도 메인이랑 똑같이 세련되게
+  만들자"는 요청에 맞춰, 기존에 완전히 기본 스타일(라이트 테마, 인라인 스타일)이던 `/login`·`/signup`
+  페이지를 메인 페이지와 같은 다크 테마 + 베토벤 배경 아트 + 크림슨/골드 그라데이션 버튼으로 다시
+  만들었습니다. 새 공유 CSS 모듈(`AuthForm.module.css`) 하나로 두 페이지가 같은 디자인을 씁니다.
+- **"대화내역" 대신 "컴파일 이력"**: 사용자가 "로그인하면 챗GPT/제미나이처럼 대화내역을 볼 수 있게
+  해달라"고 했는데, 이 앱은 대화형 구조가 아니라 프로젝트(설계도) 구조라서 말 그대로의 "대화내역"은
+  없습니다. 대신 코드를 확인해서 실제로 이미 존재하는 이력 데이터 두 가지를 찾았습니다 — 저장할
+  때마다 쌓이는 `ProjectVersion`(설계도 스냅샷)과 컴파일할 때마다 쌓이는 `PromptPackage`(과거
+  Safe/Balanced/Bold 결과) — 둘 다 이미 DB에 저장되지만 화면에는 최신 것만 보여주고 있었습니다. 이
+  사실과 두 대안을 사용자에게 그대로 보여드리고 고르게 했고, **"과거 컴파일 결과 이력"을 선택**받아
+  구현했습니다(프로젝트 버전 이력은 이번에 만들지 않았지만, 마찬가지로 데이터는 이미 있어서 나중에
+  추가하기 쉽습니다).
+- **설명 섹션을 더 "톡톡 튀게"**: 사용자가 "Problem/Service/Craft 섹션이 설명은 좋은데 음악 프롬프트
+  만드는 사이트답게 좀 더 톡톡 튀는 느낌으로 만들자"고 요청했습니다. 카드들이 한 번에 다 나타나지 않고
+  순서대로 통통 튀듯 나타나게(`Reveal`에 `delayMs` 추가, 통통 튀는 이징 곡선 적용), 카드마다 다른
+  포인트 색(기존 보라/청록/핑크/크림슨/골드 토큰을 순환)과 호버 시 살짝 뜨는 효과를 추가했습니다.
+- **새로운 사실 기반 카드 추가**: "탑 음대 논문과 음악계 거장들의 방법론을 AI에게 체득시켰다는 식의
+  설명도 넣자"는 요청에 대해, 실제로 지어낸 이야기가 아니라 **진짜로 문서에 있는 사실**만 확인하고
+  썼습니다 — `knowledge/composition_theory/top_music_school_general_composition.txt`가 실제로
+  Berklee, USC Thornton, NYU Steinhardt, Juilliard의 커리큘럼과 학술 자료를 근거로 한다고 명시하고
+  있고, `docs/METHODOLOGY.md`가 실제로 작사가 김이나와 K-pop 작사팀의 실무 관행(복수 초안 비교,
+  데모 피팅)을 이름까지 명시하며 인용하고 있습니다. 즉 이미 있는 7개 이론 엔진과 가사 기법 메뉴가
+  실제로 이 출처들을 구현한 것이라는 사실을 근거로 카드를 만들었습니다 — Phase 7 1차에서 거부했던
+  "가짜 통계/후기"와는 다르게, 이번엔 진짜로 검증된 사실입니다.
+
+### What shipped
+
+- `src/app/AuthForm.module.css` (new, shared) + restyled `src/app/login/page.tsx`,
+  `src/app/signup/page.tsx`.
+- `src/app/api/projects/[projectId]/history/route.ts` (new) — ownership-checked `GET`, up to 50
+  most recent `PromptPackage` rows, newest first, `style`/`lyrics` extracted from `fields`.
+- `src/app/projects/[id]/ProjectEditor.tsx` — new "View history" button + expandable History list.
+- `src/app/Reveal.tsx` — new optional `delayMs` prop for staggered entrance.
+- `src/app/globals.css` — `.reveal` transition changed to a back-out/bounce easing.
+- `src/app/Problem.tsx`/`Service.tsx`/`Craft.tsx` — staggered per-card reveals, per-card accent
+  colors + hover lift/glow, gradient-text headline accent, and a new 4th Craft card (grounded in
+  real cited sources, see 한글 요약).
+- `tests/unit/apiProjectHistoryRoute.test.ts` (new) — 127 unit tests total (up from 123).
+
+### Live verification
+
+- Screenshots of the redesigned Problem/Service/Craft sections and the restyled login page —
+  reviewed, colors/motion/layout all rendering as intended.
+- Full end-to-end history flow (signup → create project → save → compile → View history → expand
+  an entry) verified by temporarily running a second dev-server pass with
+  `GEMINI_API_KEY`/`GEMINI_MODEL`/`GEMINI_API_MODE` blanked to force the existing Mock path
+  (`isGeminiConfigured()`) for a fast, deterministic compile — the real-Gemini path hit the same
+  pre-existing latency flake already documented (one attempt took a full 40s), which is unrelated
+  to this feature. Dev server was restored with real keys afterward.
+- Docker Desktop was not running at the start of this slice (idle overnight) and was started,
+  waited on, then `docker compose up`/`prisma migrate deploy` run before this slice's live
+  verification, since the history feature genuinely needs a real database (unlike the previous
+  slice).
+
+### Verification at time of this entry
+
+- `pnpm typecheck`, `pnpm lint`, `pnpm build` — pass
+- `pnpm test` — 127/127 pass (up from 123)
+- `pnpm exec playwright test tests/e2e/landing.spec.ts` — 5/5 pass
+- Live walkthrough — pass (see above)
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-039 (auth restyle + compile history) and ADR-040 (livelier sections + the
+new sourced Craft card).
+
+### Known gaps carried forward
+
+- Project-version history (the "diff over time" alternative not chosen this round) — the
+  underlying `ProjectVersion` data already exists; no UI reads it back yet.
+- The rest of Phase 7 (Sound Seed Orb, provider selector, Lab preview, app section, Lighthouse
+  baseline) is still open.
+- Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first-fourth slices is still
+  pending.

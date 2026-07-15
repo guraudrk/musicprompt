@@ -474,3 +474,47 @@ reflexively starting Docker/Postgres for "live verification," check whether the 
 exercises the database — not every UI change does, and Mock-only routes like the demo endpoint are
 deliberately designed not to.
 
+---
+
+## Phase 7 (fifth slice — auth restyle, compile history, livelier sections)
+
+### Live-verifying the history feature kept hitting the pre-existing Gemini-latency flake
+
+**Symptom:** An end-to-end Playwright test (signup → project → compile → View history) failed
+waiting for the "safe" heading after clicking Compile, even with the assertion timeout raised to
+40000ms. The dev server log showed the real compile call itself took a full 40s this time (worse
+than the ~17-19s baseline measured in Phase 3, and worse than the ~20s seen once already this
+session).
+
+**Cause:** This is the same already-documented, pre-existing real-Gemini-latency variance (see
+Phase 2-tail's Troubleshooting entry) — not a defect in the new history feature. Chasing it with
+ever-larger timeouts would only be treating the symptom, and isn't this slice's problem to fix.
+
+**Fix (verification strategy, not a code fix):** Decoupled the history feature's verification from
+real Gemini entirely — stopped the normal dev server and started a second pass with
+`GEMINI_API_KEY`/`GEMINI_MODEL`/`GEMINI_API_MODE` all blanked, which makes `isGeminiConfigured()`
+(`src/lib/env.ts`) return `false` and routes every compile through the existing Mock path
+deterministically and fast. Ran the full end-to-end history flow against that instance (passed
+immediately, ~8s total), then restored the normal dev server with real keys afterward. General
+lesson: when verifying a feature that depends on *a* compile happening, but doesn't care whether
+that compile came from Mock or Gemini, don't fight a known-flaky real API for the verification —
+force the deterministic path that's already built for exactly this purpose.
+
+### First seed-script attempt failed on the generated Prisma client's file extension
+
+**Symptom:** A throwaway Node script (`node script.mjs`) meant to directly insert a `PromptPackage`
+row via Prisma failed with `ERR_MODULE_NOT_FOUND` trying to import
+`src/generated/prisma/client/index.js`.
+
+**Cause:** The generated Prisma client in this project is TypeScript source (`.ts` files, e.g.
+`src/generated/prisma/client.ts`), not pre-compiled `.js` — it's consumed via Next.js's own
+TypeScript pipeline (`@/generated/prisma/client` path alias), not runnable as plain Node ESM
+without a TS loader (`tsx`/`ts-node`), neither of which is a project dependency.
+
+**Fix:** Abandoned the raw-Node seed-script approach entirely in favor of the Mock-forced
+dev-server pass described above, which exercises the real API route end-to-end (a stronger
+verification than seeding a database row directly would have been anyway) without needing a
+TypeScript-aware script runner. General lesson: reach for "restart the dev server with different
+env vars" before "write a standalone script that reimplements part of the app's import graph" —
+the former reuses infrastructure that already works.
+

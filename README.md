@@ -17,7 +17,7 @@
 
 ## 현재 상태
 
-**Phase 0–5 + Phase 2 후반 UI(1차) + Phase 7(1~4차) 완료, 전부 라이브 검증까지 마침.** `SongDesignSpec` Zod 스키마,
+**Phase 0–5 + Phase 2 후반 UI(1차) + Phase 7(1~5차) 완료, 전부 라이브 검증까지 마침.** `SongDesignSpec` Zod 스키마,
 Generic/Suno/Udio Provider Registry, Auth.js 이메일/비밀번호 인증, Prisma/Postgres 영속성, 프로젝트
 CRUD·컴파일·내보내기 API, 단일 페이지 프로젝트 편집기, `@google/genai`(Interactions API)를 통한 실제
 Gemini 구조화 출력 컴파일러(개발 환경에서는 실패 시 Mock으로 자동 폴백), 7개 작곡 이론 엔진(FormFunction/
@@ -195,6 +195,19 @@ Reveal.tsx (Client, 공용) — IntersectionObserver로 "화면에 들어오면 
 스크롤 없이 한 화면에 들어가는 것을 스크린샷으로 확인했습니다. 페이지는 이제 4개 섹션(Hero(+데모)/
 Problem/Service/Craft)입니다. 상세는 `docs/PHASE_LOG.md` Phase 7(4차) 항목과 `DECISIONS.md` ADR-038
 참고.
+
+**(이어서, Phase 7 5차)** `/login`·`/signup` 페이지를 메인 페이지와 같은 다크 테마·베토벤 배경·
+크림슨/골드 버튼으로 다시 디자인했습니다(`AuthForm.module.css` 공유). "로그인하면 대화내역 보기"
+요청에는 — 이 앱이 챗봇이 아니라 프로젝트 구조라 말 그대로의 대화내역은 없지만, 대신 이미 DB에 쌓이고
+있던 두 가지 이력 데이터(설계도 버전 이력 `ProjectVersion` / 과거 컴파일 결과 `PromptPackage`)를
+찾아서 사용자에게 그대로 보여드리고 골라달라고 했고, **과거 컴파일 결과 이력**을 선택받아
+`GET /api/projects/{id}/history` + 프로젝트 페이지의 "View history" 버튼으로 구현했습니다. 또
+Problem/Service/Craft 설명 섹션을 더 "톡톡 튀게" — 카드가 순서대로 통통 튀며 나타나고, 카드마다 다른
+포인트 색이 붙습니다. "탑 음대 논문·음악계 거장 방법론을 AI에게 체득시켰다"는 설명 카드도 추가했는데,
+지어낸 얘기가 아니라 `knowledge/composition_theory/top_music_school_general_composition.txt`
+(Berklee/USC Thornton/NYU Steinhardt/Juilliard 커리큘럼 근거 명시)와 `docs/METHODOLOGY.md`(작사가
+김이나·K-pop 작사팀 실무 관행을 이름까지 인용)에 실제로 있는 내용만 확인하고 썼습니다. 상세는
+`docs/PHASE_LOG.md` Phase 7(5차)와 `DECISIONS.md` ADR-039/ADR-040 참고.
 
 ## 시작하기
 

@@ -11,7 +11,7 @@ function prefersReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-export function Reveal({ children }: { children: React.ReactNode }) {
+export function Reveal({ children, delayMs = 0 }: { children: React.ReactNode; delayMs?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   // Lazy initializer runs during the client's first render (not inside an effect), so the
   // reduced-motion case never needs its own setState call — only the IntersectionObserver path
@@ -38,7 +38,7 @@ export function Reveal({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div ref={ref} className="reveal" data-visible={visible}>
+    <div ref={ref} className="reveal" data-visible={visible} style={{ transitionDelay: `${delayMs}ms` }}>
       {children}
     </div>
   );

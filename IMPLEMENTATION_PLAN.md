@@ -598,10 +598,27 @@ Each requires official capability verification and tests.
     links + scroll hint all fit within one viewport at every size tested. `tests/e2e/landing.spec.ts`
     updated (removed the now-gone "Try it right now" heading case, added a dedicated
     above-the-fold-visibility case, fixed an ambiguous `getByText(/Sign up/).last()` assertion).
-12. **Next actual work**: the rest of Phase 7 (Sound Seed Orb, provider selector, Lab preview, app
+12. ~~Restyle login/signup to match the landing page; add compile history.~~ Done — ADR-039.
+    New `src/app/AuthForm.module.css` (shared by `/login`/`/signup`, reuses `HeroBackground` +
+    the crimson/gold gradient button); `GET /api/projects/{id}/history` (ownership-checked,
+    returns up to 50 past `PromptPackage` rows newest-first) + a "View history" section in
+    `ProjectEditor.tsx`. Chose compile history over project-version history after presenting both
+    real options to the user (this app has no chat/conversation data model, so a literal
+    "conversation history" doesn't apply — both alternatives were already-persisted, previously
+    unsurfaced data). 127 unit tests (up from 123); live-verified end-to-end via a temporary
+    Mock-forced dev-server pass (real Gemini hit the known Phase 7 third-slice latency flake,
+    unrelated to this feature).
+13. ~~Give the explanatory sections (Problem/Service/Craft) a livelier, "music-prompt-site" visual
+    treatment.~~ Done — ADR-040. Staggered per-card `Reveal` pop-in with a back-out/bounce easing,
+    per-card accent-color cycling (existing tokens, no new colors), and a new 4th Craft card
+    honestly grounding the theory engines/lyric techniques in the real sources
+    `docs/METHODOLOGY.md` already cites (Berklee/USC Thornton/NYU Steinhardt/Juilliard curricula,
+    Kim Eana/K-pop lyric-team practice) — not an unverified marketing claim.
+14. **Next actual work**: the rest of Phase 7 (Sound Seed Orb, provider selector, Lab preview, app
     section, Lighthouse baseline) remains open; other candidates are Phase 6 (Revision Lab), the
-    full 8/14-screen wizard (PRODUCT_SPEC §16), `contrastPlan`/`hookPlan`/`repetitionPlan` UI, or
-    the lock-field UI for `compositionTheory.*Notes` (deferred since Phase 4). A budget-limit
-    policy decision is still pending before Gemini usage caps can be implemented, and real rate
-    limiting is still needed before any anonymous path could ever be allowed to call Gemini
-    (see `DECISIONS.md`).
+    full 8/14-screen wizard (PRODUCT_SPEC §16), `contrastPlan`/`hookPlan`/`repetitionPlan` UI, the
+    lock-field UI for `compositionTheory.*Notes` (deferred since Phase 4), or project-version
+    history (the alternative not chosen this round — data already exists, UI doesn't). A
+    budget-limit policy decision is still pending before Gemini usage caps can be implemented, and
+    real rate limiting is still needed before any anonymous path could ever be allowed to call
+    Gemini (see `DECISIONS.md`).

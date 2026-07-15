@@ -885,6 +885,93 @@ the same section — the auth link and the demo's upsell link) to the specific u
 
 ---
 
+## ADR-039 — Login/signup restyled to match the landing page; compile history (not chat history) added
+
+- Status: Accepted
+- Date: 2026-07-15
+
+### Decision
+
+Two follow-on requests. First: restyle `/login` and `/signup` to match the landing page's dark,
+artistic design system rather than their previous unstyled default-light form. New shared
+`src/app/AuthForm.module.css` (card layout, `demoButton`-style crimson→gold gradient submit
+button, `HeroBackground`'s Beethoven art reused as the page background) is imported by both pages;
+no new component duplication beyond the one shared module.
+
+Second: the user asked for something like ChatGPT/Gemini's "view past conversations" after
+logging in. This product has no chat/conversational data model — Projects are structured specs,
+not message threads — so a literal equivalent doesn't exist. Investigated what *does* exist:
+`ProjectVersion` rows (a full spec snapshot per save, already written on every `PATCH`) and
+`PromptPackage` rows (every past compile result, already written on every `POST .../compile/compare`)
+are both already persisted, timestamped, and simply never read back as a list — only the current
+version/latest result was ever shown. Presented this finding plus both options to the user via
+`AskUserQuestion`; **compile history was chosen** (project version history / "diff over time" was
+not built this round, and remains available as a future option since the underlying data already
+exists for it too).
+
+New `GET /api/projects/{id}/history` (ownership-checked via the existing `requireOwnedProject`,
+same pattern as every other project route) returns up to the 50 most recent `PromptPackage` rows
+for a project, newest first, with `style`/`lyrics` extracted from the `fields` JSON column. New
+"View history" button in `ProjectEditor.tsx` renders the list with an expandable Style/Lyrics view
+per entry — no new persistence, this is a pure read of data the app already collects.
+
+### Reason
+
+Restyling the auth pages closes an obvious visual inconsistency now that the landing page has a
+real design system. The history feature was scoped to what the data already supports rather than
+building a new conversation/message data model to imitate a chat product this app fundamentally
+isn't — reusing existing, already-written data is lower-risk and ships faster than modeling
+something new.
+
+### Consequence
+
+New `tests/unit/apiProjectHistoryRoute.test.ts` (401/403/404 ownership cases + a 200 case
+asserting newest-first ordering and correct `style`/`lyrics` extraction) — 127 unit tests total
+(up from 123). Live-verified end-to-end (signup → project → compile → View history → expand) by
+temporarily running a second dev-server pass with `GEMINI_API_KEY`/`GEMINI_MODEL`/`GEMINI_API_MODE`
+blanked (forcing the existing Mock path via `isGeminiConfigured()`, `src/lib/env.ts`) to get a fast,
+deterministic compile — the real-Gemini path hit the same pre-existing latency flake documented
+under Phase 7's third slice (a real compile took as long as 40s in one attempt), which is unrelated
+to this feature and not something this change needed to fix to verify the new history logic itself.
+
+---
+
+## ADR-040 — Explanatory sections given a livelier, "music-prompt-site" visual treatment
+
+- Status: Accepted
+- Date: 2026-07-15
+
+### Decision
+
+The user asked for the Problem/Service/Craft sections (the scrolled explanation content below the
+hero) to feel more "톡톡 튀는" (bouncy/lively) — fitting for a site whose whole product is about
+music, not a dry enterprise dashboard. Changes, all additive to the existing structure:
+
+- `Reveal.tsx` gained an optional `delayMs` prop so cards within a section can pop in staggered
+  rather than all at once; `globals.css`'s shared `.reveal` transition changed from a plain `ease`
+  fade+slide to a back-out overshoot easing (`cubic-bezier(0.34, 1.56, 0.64, 1)`) plus a subtle
+  scale — a "bounce," not just a fade.
+- `Service.tsx`/`Craft.tsx` cards each get a distinct accent color (cycling through the existing
+  `--color-accent-primary`/`--color-accent-secondary`/`--color-lyrics`/`--color-accent-crimson`/
+  `--color-accent-gold` tokens — no new colors introduced) as a top border, a matching hover-glow
+  shadow, and a small hover lift; `Problem.tsx`'s headline gained a gradient-text accent span.
+- **New 4th Craft card**, added honestly rather than as unsupported marketing copy: verified via
+  `knowledge/composition_theory/top_music_school_general_composition.txt` and
+  `docs/METHODOLOGY.md` (which names Berklee/USC Thornton/NYU Steinhardt/Juilliard curricula and
+  cites lyricist Kim Eana's and K-pop lyric-team practice by name) that the 7 theory engines and
+  lyric technique menu genuinely *do* implement principles from those real sources — this isn't a
+  fabricated claim like the stats/testimonials declined in ADR-037, it's citing a source this
+  project's own documentation already names. Copy explicitly disclaims guaranteeing a hit song,
+  consistent with CLAUDE.md §3.
+
+### Reason
+
+"Lively" was interpreted as motion + color variety within the existing token system and honest
+copy — not a request to add new colors, fonts, or unverified claims. Reusing existing accent tokens
+keeps the palette coherent instead of introducing a competing color scheme.
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:

@@ -4,11 +4,15 @@ import { Reveal } from "./Reveal";
 export function Problem() {
   return (
     <section className={styles.section}>
-      <Reveal>
-        <div className={styles.inner}>
-          <h2 className={styles.heading}>Ask two AIs for the same song. Get two different songs.</h2>
+      <div className={styles.inner}>
+        <Reveal>
+          <h2 className={styles.heading}>
+            Ask two AIs for the same song. <span className={styles.pop}>Get two different songs. 🎵</span>
+          </h2>
+        </Reveal>
 
-          <div className={styles.grid}>
+        <div className={styles.grid}>
+          <Reveal delayMs={80}>
             <div className={`${styles.column} ${styles.columnWithout}`}>
               <p className={styles.columnTitle}>Without a shared spec</p>
               <ul>
@@ -17,6 +21,8 @@ export function Problem() {
                 <li>Ask for a revision, and the one line you actually liked quietly disappears.</li>
               </ul>
             </div>
+          </Reveal>
+          <Reveal delayMs={200}>
             <div className={`${styles.column} ${styles.columnWith}`}>
               <p className={styles.columnTitle}>With Music Prompt Architect</p>
               <ul>
@@ -25,9 +31,9 @@ export function Problem() {
                 <li>Lines you lock stay exactly as written through every compile and revision.</li>
               </ul>
             </div>
-          </div>
+          </Reveal>
         </div>
-      </Reveal>
+      </div>
     </section>
   );
 }

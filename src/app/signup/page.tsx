@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
+import styles from "../AuthForm.module.css";
+import { HeroBackground } from "../HeroBackground";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -41,31 +43,45 @@ export default function SignupPage() {
   }
 
   return (
-    <main style={{ maxWidth: "24rem", margin: "4rem auto", padding: "0 1rem" }}>
-      <h1>Sign up</h1>
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-        <label>
-          Email
-          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-        </label>
-        <label>
-          Password (min 8 characters)
-          <input
-            type="password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
-        {error && <p role="alert" style={{ color: "var(--color-warning)" }}>{error}</p>}
-        <button type="submit" disabled={submitting}>
-          {submitting ? "Signing up..." : "Sign up"}
-        </button>
-      </form>
-      <p>
-        Already have an account? <a href="/login">Log in</a>
-      </p>
+    <main className={styles.page}>
+      <HeroBackground />
+      <div className={styles.card}>
+        <h1 className={styles.heading}>Sign up</h1>
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <label className={styles.field}>
+            Email
+            <input
+              className={styles.input}
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </label>
+          <label className={styles.field}>
+            Password (min 8 characters)
+            <input
+              className={styles.input}
+              type="password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
+          {error && (
+            <p role="alert" className={styles.error}>
+              {error}
+            </p>
+          )}
+          <button type="submit" className={styles.submit} disabled={submitting}>
+            {submitting ? "Signing up..." : "Sign up"}
+          </button>
+        </form>
+        <p className={styles.switchLink}>
+          Already have an account? <a href="/login">Log in</a>
+        </p>
+      </div>
     </main>
   );
 }

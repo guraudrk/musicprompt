@@ -49,6 +49,17 @@ type FunctionalPrincipleRow = ReferencePrinciple & { appliesToText: string };
 
 type CompareResult = { safe: MusicAIPromptPackage; balanced: MusicAIPromptPackage; bold: MusicAIPromptPackage };
 
+type HistoryEntry = {
+  id: string;
+  strategy: string;
+  providerId: string;
+  model: string;
+  apiMode: string;
+  style: string | null;
+  lyrics: string | null;
+  createdAt: string;
+};
+
 function splitList(text: string): string[] {
   return text
     .split(/[,\n]/)
@@ -112,6 +123,11 @@ export function ProjectEditor({ project }: { project: Project }) {
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
   const [diffTarget, setDiffTarget] = useState<LyricsDraft | null>(null);
+
+  const [history, setHistory] = useState<HistoryEntry[] | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
 
   function addSurfaceTrait() {
     setSurfaceTraits((rows) => [...rows, { id: makeId(), description: "" }]);
@@ -332,6 +348,22 @@ export function ProjectEditor({ project }: { project: Project }) {
     setCurrent(updated);
     setOriginalLyrics(draft.lyrics);
     setDiffTarget(null);
+  }
+
+  async function handleLoadHistory() {
+    setLoadingHistory(true);
+    setHistoryError(null);
+
+    const response = await fetch(`/api/projects/${project.id}/history`);
+
+    setLoadingHistory(false);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: "Couldn't load history." }));
+      setHistoryError(body.error ?? "Couldn't load history.");
+      return;
+    }
+    const { history: entries } = await response.json();
+    setHistory(entries);
   }
 
   async function copyToClipboard(key: string, text: string) {
@@ -660,6 +692,9 @@ export function ProjectEditor({ project }: { project: Project }) {
         <button onClick={handleGenerateDrafts} disabled={drafting}>
           {drafting ? "Drafting..." : "Generate Drafts (A / B / C)"}
         </button>
+        <button onClick={handleLoadHistory} disabled={loadingHistory}>
+          {loadingHistory ? "Loading..." : "View history"}
+        </button>
         <a href={`/api/projects/${project.id}/export/txt`}>Export TXT</a>
         <a href={`/api/projects/${project.id}/export/json`}>Export JSON</a>
       </div>
@@ -668,6 +703,7 @@ export function ProjectEditor({ project }: { project: Project }) {
       {compileError && <p role="alert" style={{ color: "var(--color-warning)" }}>{compileError}</p>}
       {analyzeError && <p role="alert" style={{ color: "var(--color-warning)" }}>{analyzeError}</p>}
       {draftError && <p role="alert" style={{ color: "var(--color-warning)" }}>{draftError}</p>}
+      {historyError && <p role="alert" style={{ color: "var(--color-warning)" }}>{historyError}</p>}
 
       {drafts && (
         <section>
@@ -766,6 +802,39 @@ export function ProjectEditor({ project }: { project: Project }) {
               </article>
             );
           })}
+        </section>
+      )}
+
+      {history && (
+        <section>
+          <h2>History</h2>
+          {history.length === 0 ? (
+            <p>No past compiles yet.</p>
+          ) : (
+            <ul>
+              {history.map((entry) => (
+                <li key={entry.id} style={{ marginBottom: "0.5rem" }}>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.8rem" }}>
+                    {new Date(entry.createdAt).toLocaleString()}
+                  </span>{" "}
+                  — <strong>{entry.strategy}</strong> ({entry.providerId}, {entry.model})
+                  <button onClick={() => setExpandedHistoryId((id) => (id === entry.id ? null : entry.id))} style={{ marginLeft: "0.5rem" }}>
+                    {expandedHistoryId === entry.id ? "Hide" : "Show"}
+                  </button>
+                  {expandedHistoryId === entry.id && (
+                    <div style={{ border: "1px solid currentColor", padding: "0.75rem", marginTop: "0.5rem" }}>
+                      <p>
+                        <strong>Style:</strong> {entry.style ?? "(none)"}
+                      </p>
+                      <p>
+                        <strong>Lyrics:</strong> {entry.lyrics ?? "(none)"}
+                      </p>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
     </main>

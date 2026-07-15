@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
+import styles from "../AuthForm.module.css";
+import { HeroBackground } from "../HeroBackground";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -27,25 +29,44 @@ export default function LoginPage() {
   }
 
   return (
-    <main style={{ maxWidth: "24rem", margin: "4rem auto", padding: "0 1rem" }}>
-      <h1>Log in</h1>
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-        <label>
-          Email
-          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-        </label>
-        <label>
-          Password
-          <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-        </label>
-        {error && <p role="alert" style={{ color: "var(--color-warning)" }}>{error}</p>}
-        <button type="submit" disabled={submitting}>
-          {submitting ? "Logging in..." : "Log in"}
-        </button>
-      </form>
-      <p>
-        No account? <a href="/signup">Sign up</a>
-      </p>
+    <main className={styles.page}>
+      <HeroBackground />
+      <div className={styles.card}>
+        <h1 className={styles.heading}>Log in</h1>
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <label className={styles.field}>
+            Email
+            <input
+              className={styles.input}
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </label>
+          <label className={styles.field}>
+            Password
+            <input
+              className={styles.input}
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
+          {error && (
+            <p role="alert" className={styles.error}>
+              {error}
+            </p>
+          )}
+          <button type="submit" className={styles.submit} disabled={submitting}>
+            {submitting ? "Logging in..." : "Log in"}
+          </button>
+        </form>
+        <p className={styles.switchLink}>
+          No account? <a href="/signup">Sign up</a>
+        </p>
+      </div>
     </main>
   );
 }
