@@ -8,6 +8,11 @@ vi.mock("@/lib/prisma", () => ({
 const mockAuth = vi.fn();
 vi.mock("@/auth", () => ({ auth: () => mockAuth() }));
 
+const mockCheckDemoRateLimit = vi.fn<() => { allowed: boolean; retryAfterMs?: number }>(() => ({ allowed: true }));
+vi.mock("@/lib/demoRateLimit", () => ({
+  checkDemoRateLimit: () => mockCheckDemoRateLimit(),
+}));
+
 const { POST } = await import("@/app/api/demo/compile/route");
 
 function makeRequest(body: unknown) {
@@ -18,7 +23,7 @@ function makeRequest(body: unknown) {
   });
 }
 
-describe("/api/demo/compile route (anonymous, Mock-only)", () => {
+describe("/api/demo/compile route (anonymous, rate-limited real compile — ADR-046)", () => {
   it("returns 400 for an empty idea", async () => {
     const response = await POST(makeRequest({ idea: "" }));
     expect(response.status).toBe(400);
@@ -72,5 +77,16 @@ describe("/api/demo/compile route (anonymous, Mock-only)", () => {
     const response = await POST(makeRequest({ idea: "something I feel deeply about, please help" }));
     const json = await response.json();
     expect(json.package.fields.style).toContain("unspecified genre");
+  });
+
+  it("returns 429 with a Retry-After header when the rate limit is exceeded (ADR-046)", async () => {
+    mockCheckDemoRateLimit.mockReturnValueOnce({ allowed: false, retryAfterMs: 60_000 });
+
+    const response = await POST(makeRequest({ idea: "A bittersweet farewell." }));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("60");
+    const json = await response.json();
+    expect(json.error).toMatch(/too many/i);
   });
 });

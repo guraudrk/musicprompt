@@ -662,3 +662,41 @@ a feature that's entangled with a known 3-way-concurrency latency issue, isolate
 first — it's cheaper, faster, and separates "does the feature work" from "does the existing
 concurrency limitation still exist" instead of conflating both into one noisy signal.
 
+---
+
+## Anonymous demo real-Gemini rollout (ADR-046)
+
+### An extremely sparse test input took ~193s and the compiler silently fell back to Mock
+
+**Symptom:** While live-verifying that rapid repeated demo requests aren't rate-limited in
+development, one throwaway test input ("a quick test idea" — much sparser than any realistic demo
+input) took 193 seconds and the returned package's `fields.style` showed Mock's generic template
+text ("unspecified genre at unspecified...") instead of real Gemini output, even though
+`promptQuality` clearly showed real, content-aware Gemini evaluator scoring in the same response.
+
+**Cause:** Not a bug in the rate-limiting or `compilePipelineDeps`-switch changes themselves — this
+is `wrapCompilerWithDevFallback` (`src/llm/devFallback.ts`) doing exactly what it's designed to do:
+the Gemini *compiler* call apparently struggled or timed out on this unusually sparse/generic
+input and fell back to Mock in development, while the separate *evaluator* call (Stage F, a
+different system instruction/schema) succeeded independently and correctly flagged the output as
+placeholder-y junk. This is the same class of real-Gemini latency variance already documented in
+ADR-045/`resilience.ts`, just newly visible because the demo now goes through the real pipeline.
+
+**Not fixed — expected, disclosed behavior.** The user's actual real-world query (rich, specific,
+music-domain input) succeeded in 37s with excellent output in the same session. General lesson:
+an artificially minimal/degenerate test input can behave very differently from realistic input
+when hitting a real LLM — don't over-index on an edge case discovered incidentally during
+unrelated verification (here, checking rate-limit behavior) as if it were a new regression; check
+whether it reproduces with realistic input before treating it as something to fix.
+
+### Rate limiter is in-memory only — not a hard guarantee on serverless (Vercel)
+
+**Not a bug, a disclosed design limitation (ADR-046).** `src/lib/rateLimit.ts` stores counts in a
+plain `Map` inside one running Node process. This is exactly correct for local dev and a
+single-instance deployment, but on Vercel's serverless platform, concurrent or cold-start
+invocations can run in separate instances with independent memory — so the configured "5 requests
+per IP per hour" limit is not perfectly enforced across every possible instance. Before relying on
+this as a hard production guarantee, replace the in-memory `Map` with a shared store (Vercel
+KV or Upstash Redis) — tracked in `IMPLEMENTATION_PLAN.md` as a named pre-deployment follow-up, not
+silently assumed to be already solved.
+

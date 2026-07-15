@@ -1,30 +1,34 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { compilePromptPackage } from "@/compiler/pipeline";
-import { InMemoryProviderRegistry } from "@/providers/registry";
-import { MockPromptCompiler } from "@/llm/mock/mockPromptCompiler";
-import { MockPromptEvaluator } from "@/llm/mock/mockPromptEvaluator";
+import { compilePipelineDeps } from "@/lib/compilerDeps";
 import { buildDefaultSpec } from "@/domain/songDesignSpec/defaultSpec";
 import { extractHints } from "@/domain/songDesignSpec/extractHints";
+import { checkDemoRateLimit } from "@/lib/demoRateLimit";
 
 /**
  * Anonymous, no-login demo of the compile pipeline for the landing page. Deliberately isolated
  * from the real project/auth system: no `@/lib/authz`, no repository, no `prisma` call, no
- * persistence at all. Deliberately Mock-only — this hand-builds its own deps instead of importing
- * `compilePipelineDeps` from `@/lib/compilerDeps`, which would resolve to real Gemini whenever
- * GEMINI_API_KEY/GEMINI_MODEL/GEMINI_API_MODE are configured. There is no rate limiting yet
- * (tracked as a pending gap since Phase 0), so an unauthenticated route must never be able to
- * trigger a real, billable Gemini call. See DECISIONS.md.
+ * persistence at all.
+ *
+ * Uses the same `compilePipelineDeps` (real Gemini when configured, Mock fallback in dev, Mock-only
+ * when unconfigured) every authenticated compile uses — including the 7 composition-theory engines
+ * and the theoryAddressal enforcement (ADR-045) — protected by `checkDemoRateLimit` instead of the
+ * previous structural Mock-only guarantee (ADR-036, superseded by ADR-046): unlimited outside
+ * production, 5 requests per IP per hour in production. See DECISIONS.md ADR-046.
  */
 const BodySchema = z.object({ idea: z.string().min(1).max(2000) });
 
-const demoDeps = {
-  registry: new InMemoryProviderRegistry(),
-  compiler: new MockPromptCompiler(),
-  evaluator: new MockPromptEvaluator(),
-};
-
 export async function POST(request: Request) {
+  const rateLimit = checkDemoRateLimit(request);
+  if (!rateLimit.allowed) {
+    const retryAfterSeconds = Math.ceil((rateLimit.retryAfterMs ?? 0) / 1000);
+    return NextResponse.json(
+      { error: "Too many demo requests from this address. Please try again later, or sign up for unlimited access." },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } },
+    );
+  }
+
   const body = await request.json().catch(() => null);
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
@@ -46,7 +50,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await compilePromptPackage(spec, "generic", "balanced", demoDeps);
+    const result = await compilePromptPackage(spec, "generic", "balanced", compilePipelineDeps);
     return NextResponse.json({ package: result.package });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Compile failed." }, { status: 400 });

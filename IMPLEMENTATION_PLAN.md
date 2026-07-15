@@ -673,7 +673,26 @@ Each requires official capability verification and tests.
     concurrency noise) that a spec with nothing substantive produces an honest empty
     `theoryAddressal`, and a spec with a real issue (4 genres, tripping SubtractionEngine) produces
     a traceable entry whose resolution is genuinely reflected in the compiled `style` field.
-19. **Next actual work**: the larger structure/emotionCurve/contrastPlan/hookPlan inference
+19. ~~Let the anonymous demo use real Gemini + composition theory, gated by rate limiting.~~ Done —
+    ADR-046 (supersedes ADR-036's Mock-only structural guarantee). User tested the demo with a real
+    query and got Mock's generic placeholder output; confirmed the demo never called Gemini or ran
+    the theory engines by design, pending rate limiting. User set explicit numbers: unlimited
+    during MVP/dev, 5 requests/IP/hour once deployed to Vercel, unlimited for signed-in users (no
+    extra code needed — they use the separate authenticated compile endpoints already). Added
+    `src/lib/rateLimit.ts` (generic in-memory fixed-window limiter) + `src/lib/demoRateLimit.ts`
+    (demo-specific instance, IP-keyed); `src/app/api/demo/compile/route.ts` now uses the shared
+    `compilePipelineDeps` (same Gemini-when-configured resolution as authenticated compiles)
+    instead of hand-built Mock-only deps, so the 7 theory engines and ADR-045's `theoryAddressal`
+    enforcement now apply automatically. 162 unit tests (up from 156); live-verified with the
+    user's exact reported idea — real Gemini produced rich, specific output (concrete
+    instrumentation, real Korean dialogue-format lyrics, fitting title) in 37s, and confirmed
+    multiple consecutive requests succeed unrestricted in dev. **Disclosed limitation**: the
+    in-memory rate-limit store only works correctly within a single process — a shared store
+    (Vercel KV/Upstash) is needed before the "5/hour" limit can be a hard guarantee across Vercel's
+    serverless instances; tracked as a real pre-deployment follow-up, not solved yet.
+20. **Next actual work**: replacing the in-memory demo rate limiter with a shared store (Vercel
+    KV/Upstash Redis) before actual Vercel deployment is now a concrete, well-scoped pre-deployment
+    task (ADR-046); the larger structure/emotionCurve/contrastPlan/hookPlan inference
     follow-up to item 17 is now a real, well-scoped candidate; translating `/dashboard` and the
     `ProjectEditor` form (the deferred i18n scope from the language-switcher slice) is also a real,
     sizeable candidate; the rest of Phase 7 (Sound Seed Orb,

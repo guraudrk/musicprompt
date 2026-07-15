@@ -1285,6 +1285,81 @@ Live-verified against the real Gemini-backed dev server via a single-strategy co
 
 ---
 
+## ADR-046 — Anonymous demo now uses real Gemini + composition theory, gated by rate limiting (supersedes ADR-036's structural guarantee)
+
+- Status: Accepted
+- Date: 2026-07-15
+
+### Decision
+
+The user tested the demo with a real query ("기차역에서의 씁쓸한 이별, 남녀 대화 형식, kpop과 jpop의
+융합") and got Mock's generic template output, confirming the demo never called Gemini or ran the
+composition-theory engines — a deliberate structural guarantee from ADR-036, adopted because there
+was no rate limiting yet and an anonymous route must never be able to trigger unlimited billable
+Gemini calls. The user decided this guardrail should now be lifted, with explicit numbers:
+**unlimited during MVP/local development; 5 requests per IP per hour once actually deployed to
+Vercel; unlimited for signed-in users** (which requires no new code — signed-in users already use
+the separate authenticated `/api/projects/{id}/compile/...` endpoints that this limiter doesn't
+touch at all). Building an actual paid-membership tier was floated as a future idea but is
+explicitly out of scope now (CLAUDE.md §6 excludes Payments from the MVP).
+
+Implementation:
+
+- `src/lib/rateLimit.ts` (new) — a generic, pure, in-memory fixed-window rate limiter
+  (`createRateLimiter({ windowMs, maxRequests, now? })`), fully unit-testable in isolation via an
+  injectable clock.
+- `src/lib/demoRateLimit.ts` (new) — the demo-specific instance:
+  `maxRequests: process.env.NODE_ENV === "production" ? 5 : Infinity`, `windowMs: 1 hour`, keyed by
+  client IP (`x-forwarded-for` first entry, falling back to `x-real-ip`, then `"unknown"`).
+- `src/app/api/demo/compile/route.ts` — now imports `compilePipelineDeps` from
+  `@/lib/compilerDeps` (the same Gemini-when-configured/dev-fallback resolution every authenticated
+  compile already uses) instead of hand-building Mock-only deps. `runTheoryEngines` already runs
+  unconditionally inside `compilePromptPackage` (Stage B), so the 7 composition-theory engines and
+  the ADR-045 `theoryAddressal` enforcement now apply to the demo automatically — no separate
+  wiring needed. A `checkDemoRateLimit()` call at the top of `POST` returns `429` with a
+  `Retry-After` header when exceeded.
+
+### Disclosed limitation
+
+`rateLimit.ts`'s in-memory store is only correct within a single running process. On Vercel's
+serverless platform, concurrent or cold-start invocations may run in separate instances with
+independent memory, so the "5/hour" production limit is not a hard cross-instance guarantee — it
+still meaningfully raises the bar over no limiting at all. **Before relying on this as a real
+production guarantee on Vercel, a shared store (Vercel KV or Upstash Redis) should replace the
+in-memory `Map`** — tracked as a real, named follow-up (see IMPLEMENTATION_PLAN.md), not silently
+treated as solved.
+
+### Reason
+
+The user's stated priority (this session, repeatedly) is that the demo must showcase the product's
+actual value — theory + Gemini producing something genuinely good — not a Mock placeholder. Rate
+limiting was the one prerequisite blocking this from ADR-036's own reasoning; once the user set
+concrete numbers for it, lifting the Mock-only guarantee became safe to do. Reusing
+`compilePipelineDeps` (rather than hand-wiring a second real-Gemini path) keeps exactly one
+Gemini-selection code path in the codebase.
+
+### Verification
+
+- Live-verified against the real Gemini-backed dev server with the user's exact reported idea:
+  produced a genuinely rich, specific result — full prompt, real Korean call-and-response lyrics in
+  the requested male/female dialogue format, a fitting title, concrete instrumentation
+  (piano/strings), and correct empty `theoryAddressal` (no active warning/blocking issues for a
+  fresh demo spec) — in 37s.
+- Confirmed unlimited-in-dev holds: multiple consecutive real requests succeeded with no 429.
+- Also observed (edge case, not the user's actual query): an extremely sparse test input ("a quick
+  test idea") took ~193s and the compiler call fell back to Mock in development — the existing
+  dev-only fallback (`wrapCompilerWithDevFallback`) working exactly as designed under Gemini's
+  known latency variance (ADR-045, `resilience.ts`), not a new failure mode introduced here; the
+  separate evaluator call still succeeded with real, content-aware scoring in the same response.
+- `tests/unit/rateLimit.test.ts` (new): allow-under-limit, block-at-limit, per-key independence,
+  window-reset, and `Infinity`-as-unlimited, all with an injected clock (no real timers).
+- `tests/unit/apiDemoCompileRoute.test.ts` (updated): mocks `@/lib/demoRateLimit` (default
+  allowed, one test overriding to blocked) — existing content-assertion tests pass unchanged since
+  `compilePipelineDeps` still resolves to Mock in the test environment (no `GEMINI_API_KEY` set for
+  `vitest`). 162 unit tests total (up from 156).
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:

@@ -1303,3 +1303,80 @@ user after live-testing revealed the latency cost, and the disclosed 3-way-concu
   follow-up) — still pending from the previous slice.
 - Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first-sixth slices is still
   pending.
+
+---
+
+## Anonymous demo unlocked to real Gemini + theory, behind rate limiting (2026-07-15, ADR-046)
+
+### 한글 요약
+
+- **왜 만들었나**: 사용자가 실제로 "기차역에서의 씁쓸한 이별, 남녀 대화 형식, kpop과 jpop의 융합"을
+  데모에 입력했더니 "K-pop/J-pop at unspecified... unspecified instrumentation"라는 Mock 템플릿
+  결과만 나왔습니다. 확인해보니 로그인 없는 데모는 처음부터(ADR-036) 절대 Gemini를 부르지 않고
+  작곡 이론 엔진도 돌리지 않도록 **구조적으로** 막혀 있었습니다 — 속도 제한이 아직 없어서 익명
+  사용자가 무제한으로 과금되는 Gemini 호출을 낼 수 있는 위험 때문이었습니다.
+- **사용자의 결정**: MVP/로컬 개발 단계에서는 무제한, 실제 Vercel 배포 단계에서는 IP당 시간당
+  5회로 제한, 로그인한 사용자는 무제한(이건 별도 코드가 필요 없음 — 로그인 사용자는 이 제한과
+  무관한 별도의 인증된 컴파일 엔드포인트를 이미 쓰고 있음). 멤버십 결제 기능은 이번에 만들지
+  않음(CLAUDE.md MVP 범위에서 명시적으로 제외된 항목).
+- **무엇을 만들었나**: `src/lib/rateLimit.ts`(범용 인메모리 고정 윈도우 속도 제한기)와
+  `src/lib/demoRateLimit.ts`(데모 전용 인스턴스, IP 기준, 프로덕션에서만 시간당 5회, 그 외에는
+  무제한)를 새로 만들고, 데모 API가 직접 만들던 Mock 전용 의존성 대신 인증된 컴파일과 완전히
+  동일한 `compilePipelineDeps`를 쓰도록 바꿨습니다. 컴파일 파이프라인 안에서 7개 작곡 이론 엔진은
+  이미 무조건 실행되므로, 이 전환만으로 이론 엔진 + `theoryAddressal` 강제(ADR-045)까지 자동으로
+  데모에 적용됩니다.
+- **라이브 검증**: 사용자가 실제로 입력했던 문장 그대로 실제 서버에 넣어봤더니, 실제 Gemini가
+  구체적인 프롬프트, 요청하신 남녀 대화 형식의 실제 한국어 가사, 어울리는 제목, 구체적인 악기
+  구성(피아노·현악)까지 담긴 결과를 37초 만에 만들어냈습니다. 여러 번 연속 요청해도 개발 환경에서는
+  전혀 막히지 않는 것도 확인했습니다. (참고로 아주 짧고 애매한 테스트 문장("a quick test idea")을
+  넣었을 때는 193초가 걸리며 컴파일 호출이 개발 전용 Mock 폴백으로 넘어간 경우도 관찰했는데, 이는
+  ADR-045에서 이미 문서화한 실제 Gemini 지연 변동성이 정상적으로 작동한 것이지 새로운 버그가
+  아닙니다.)
+- **정직하게 남겨둔 한계**: 인메모리 속도 제한기는 서버 프로세스 하나 안에서만 정확하게 동작합니다.
+  Vercel의 서버리스 환경에서는 동시/콜드스타트 호출이 서로 다른 인스턴스(별도 메모리)에서 실행될
+  수 있어서, "시간당 5회"가 완벽하게 보장되지는 않습니다. 실제로 Vercel에 배포하기 전에는 공유
+  저장소(Vercel KV나 Upstash Redis)로 바꿔야 한다는 걸 숨기지 않고 다음 작업으로 명시해뒀습니다.
+
+### What shipped
+
+- `src/lib/rateLimit.ts` (new) — pure, injectable-clock, in-memory fixed-window rate limiter.
+- `src/lib/demoRateLimit.ts` (new) — demo-specific instance (`Infinity` outside production, 5/hour
+  in production), IP extraction (`x-forwarded-for`/`x-real-ip`/`"unknown"`).
+- `src/app/api/demo/compile/route.ts` — now uses `compilePipelineDeps` (real Gemini when
+  configured, same as every authenticated compile) instead of hand-built Mock-only deps; added a
+  `checkDemoRateLimit()` gate returning 429 + `Retry-After` when exceeded. Rewrote the file's
+  header comment to describe the new rate-limited-real-access model (ADR-046) instead of the
+  superseded Mock-only structural guarantee (ADR-036).
+- `tests/unit/rateLimit.test.ts` (new), `tests/unit/apiDemoCompileRoute.test.ts` (updated: mocks
+  `@/lib/demoRateLimit`, new 429 test). 162 unit tests total (up from 156).
+
+### Live verification
+
+- Real Gemini, user's exact reported idea: rich, specific, on-request output (male/female Korean
+  dialogue lyrics, concrete instrumentation, fitting title) in 37s; `theoryAddressal` correctly
+  empty (no active warning/blocking issues for a fresh demo spec).
+- Confirmed unlimited-in-dev: multiple consecutive real requests all succeeded, no 429.
+- Observed (edge case, not a regression): an extremely sparse test input triggered the existing
+  dev-only Mock fallback after ~193s of real Gemini latency — the already-documented ADR-045
+  latency-variance behavior working as designed, not a new failure.
+
+### Verification at time of this entry
+
+- `pnpm typecheck`, `pnpm lint`, `pnpm build` — pass
+- `pnpm test` — 162/162 pass (up from 156)
+- Live walkthrough (real Gemini with the user's exact query + unlimited-in-dev check) — pass
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-046 (supersedes ADR-036; rate-limit numbers, the disclosed in-memory/
+serverless limitation, and the reasoning for lifting the Mock-only guarantee).
+
+### Known gaps carried forward
+
+- Shared-store-backed rate limiting (Vercel KV/Upstash) before actual Vercel deployment — the
+  in-memory limiter is not a hard cross-instance guarantee on serverless.
+- 3-way-concurrent Safe/Balanced/Bold real-Gemini latency/timeout risk — still not resolved.
+- Structure/emotionCurve/contrastPlan/hookPlan/compositionTheory inference (spec-interpreter
+  follow-up) — still pending.
+- Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first-sixth slices is still
+  pending.
