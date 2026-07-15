@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { compilePromptPackage } from "@/compiler/pipeline";
 import { compilePipelineDeps } from "@/lib/compilerDeps";
+import { MockPromptEvaluator } from "@/llm/mock/mockPromptEvaluator";
 import { buildDefaultSpec } from "@/domain/songDesignSpec/defaultSpec";
 import { extractHints } from "@/domain/songDesignSpec/extractHints";
 import { checkDemoRateLimit } from "@/lib/demoRateLimit";
@@ -11,12 +12,20 @@ import { checkDemoRateLimit } from "@/lib/demoRateLimit";
  * from the real project/auth system: no `@/lib/authz`, no repository, no `prisma` call, no
  * persistence at all.
  *
- * Uses the same `compilePipelineDeps` (real Gemini when configured, Mock fallback in dev, Mock-only
- * when unconfigured) every authenticated compile uses — including the 7 composition-theory engines
- * and the theoryAddressal enforcement (ADR-045) — protected by `checkDemoRateLimit` instead of the
- * previous structural Mock-only guarantee (ADR-036, superseded by ADR-046): unlimited outside
- * production, 5 requests per IP per hour in production. See DECISIONS.md ADR-046.
+ * Uses the same compiler resolution `compilePipelineDeps` uses (real Gemini when configured, Mock
+ * fallback in dev, Mock-only when unconfigured) — including the 7 composition-theory engines and
+ * the theoryAddressal enforcement (ADR-045) — protected by `checkDemoRateLimit` instead of the
+ * previous structural Mock-only guarantee (ADR-036, superseded by ADR-046).
+ *
+ * The evaluator (Stage F) is deliberately always Mock here, even when Gemini is configured
+ * (ADR-049): `promptQuality` is never displayed in the demo UI, so a second real, sequential
+ * Gemini call for it was pure wasted latency — observed real-world compiles compounding into
+ * multi-minute waits (up to ~6min: both compile and evaluate timing out and retrying) for zero
+ * user-visible benefit. Authenticated compiles (`compilerDeps.ts`) are unaffected and still get a
+ * real evaluator.
  */
+const demoEvaluator = new MockPromptEvaluator();
+
 const BodySchema = z.object({ idea: z.string().min(1).max(2000) });
 
 export async function POST(request: Request) {
@@ -50,7 +59,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await compilePromptPackage(spec, "generic", "balanced", compilePipelineDeps);
+    const deps = { ...compilePipelineDeps, evaluator: demoEvaluator };
+    const result = await compilePromptPackage(spec, "generic", "balanced", deps);
     return NextResponse.json({ package: result.package });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Compile failed." }, { status: 400 });

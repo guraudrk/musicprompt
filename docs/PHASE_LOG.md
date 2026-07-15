@@ -1499,3 +1499,61 @@ See `DECISIONS.md` ADR-048.
   follow-up) — still pending.
 - Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first-sixth slices is still
   pending.
+
+---
+
+## Demo latency/reliability fix (2026-07-15, ADR-049)
+
+### 한글 요약
+
+- 방금 이론 반영(ADR-048)을 배포한 직후, 사용자가 데모에서 다시 Mock 템플릿 결과("Pop at
+  up-tempo, familiar with one distinctive twist...")를 봤다며 "이론이 진짜 반영된 거 맞아?",
+  "속도를 최소 3배는 줄여야겠다"고 알려줬습니다.
+- 서버 로그를 확인해보니 진짜 원인은 실제 Gemini 호출이 90초 타임아웃에 걸려 개발 환경에서 조용히
+  Mock으로 폴백된 것이었습니다. 게다가 재시도 설정(`maxRetries: 1`) 때문에 컴파일이 타임아웃되면
+  똑같은 요청을 한 번 더 시도해서 최악의 경우 3~6분까지 걸리고 있었습니다.
+- 세 가지를 고쳤습니다: (1) 데모에서는 평가(evaluator) 단계를 완전히 Mock으로 고정 — 평가 결과는
+  화면에 표시조차 안 되므로 실제 Gemini를 한 번 더 부르는 건 순수 낭비였습니다. (2) 재시도를
+  1회→0회로 줄임 — 이미 타임아웃난 요청을 똑같이 재시도해봤자 성공할 가능성이 낮으므로, 기다리는
+  시간을 두 배로 늘리는 것보다 한 번에 실패하고 넘어가는 게 낫습니다. (3) ADR-048에서 추가한 이론
+  설명 부분을 약 40% 압축했습니다.
+- **솔직한 검증 결과**: 완전히 다른 평범한 문장("봄날 벚꽃길을 걷는 설렘, 인디팝, 밝은 분위기")은
+  실제 Gemini로 26.5초 만에 훌륭한 결과를 냈습니다(기존 ~70초에서 크게 개선). 하지만 사용자가 처음
+  테스트했던 그 문장(한/일 이중 언어 + 남녀 대화 + 두 장르 융합)은 세 가지를 다 고친 뒤에도 여전히
+  가끔 90초 타임아웃에 걸렸습니다. 다른 문장은 바로 성공했으므로 전체 세션이 느려진 게 아니라, 그
+  특정 문장 자체가 모델에게 유난히 까다로운 요청(이중 언어 + 대화 구조 + 장르 융합을 동시에 처리)
+  이라고 판단했습니다. "모든 입력에 대해 3배 빨라진다"고 과장하지 않고, 일반적인 경우는 확실히
+  개선됐지만 유난히 까다로운 입력은 여전히 가끔 느릴 수 있다고 정직하게 남겨뒀습니다.
+
+### What shipped
+
+- `src/app/api/demo/compile/route.ts` — always uses `MockPromptEvaluator` for the demo (real
+  evaluator result was never displayed; removes a whole wasted real-Gemini round-trip).
+- `src/llm/gemini/resilience.ts` — `GEMINI_REQUEST_OPTIONS.maxRetries` lowered `1` → `0`.
+- `src/llm/gemini/prompts/provider-compiler.system.md` — theory-grounding section (ADR-048)
+  rewritten ~40% shorter, same substance/citations.
+- `tests/unit/geminiLLMProvider.test.ts` — updated `maxRetries` assertion to match.
+
+### Live verification
+
+- Fresh idea, real Gemini: 26.5s, genuinely good output — confirms the fix helps the typical case.
+- User's original bilingual/dual-vocal idea: still occasionally hit the 90s timeout even after all
+  three fixes; confirmed this wasn't a session-wide slowdown by testing a different idea
+  immediately after (succeeded quickly) — an honest, disclosed remaining limitation, not hidden.
+- `pnpm typecheck`/`lint`/`test` (162/162)/`build` — pass.
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-049.
+
+### Known gaps carried forward
+
+- Shared-store-backed rate limiting (Vercel KV/Upstash) before actual Vercel deployment.
+- 3-way-concurrent Safe/Balanced/Bold real-Gemini latency/timeout risk — still not resolved.
+- Unusually demanding single-strategy requests (bilingual, multi-perspective, genre-fusion) can
+  still occasionally exceed the 90s timeout even after ADR-049 — no further mitigation attempted
+  this slice beyond what's already shipped.
+- Structure/emotionCurve/contrastPlan/hookPlan/compositionTheory inference (spec-interpreter
+  follow-up) — still pending.
+- Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first-sixth slices is still
+  pending.

@@ -22,46 +22,26 @@ no prose, no markdown fences, no commentary.
 
 ## Grounding in real songwriting pedagogy (knowledge/composition_theory/top_music_school_general_composition.txt)
 
-The 7 theory engines give you structural warnings, but you should also draw directly on the
-actual composition-theory document this project is built on — sourced from Berklee, USC Thornton,
-NYU Steinhardt, and Juilliard curricula plus Music Theory Online/arXiv research. Apply these
-concretely so `style`/`prompt`/`structureNotes` demonstrate real songwriting sophistication, not
-generic adjective stacking:
+Also draw on this project's composition-theory source (Berklee/USC Thornton/NYU Steinhardt/
+Juilliard curricula + music-theory research) so `style`/`prompt`/`structureNotes` show real
+sophistication, not adjective stacking. Keep this concise — apply the ideas, don't restate them.
 
-**Seven core principles** — every compile should reflect these where the design allows it:
-1. Form: sections have distinct functions (verse = initiation, pre-chorus = buildup, chorus =
-   arrival, bridge = contrast, final chorus = expanded return) — don't describe a song as an
-   undifferentiated block of style words.
-2. Hook: the single most memorable repeating unit (melodic, lyrical, rhythmic, harmonic, or
-   timbral) should be identifiable in your description.
-3. Prosody: lyric meaning, melodic direction, rhythmic stress, and harmonic color should point
-   toward the same emotion — don't describe a sad theme with an incongruously upbeat arrangement.
-4. Tension and release: energy should move (verse restrains, pre-chorus builds, chorus arrives,
-   bridge contrasts, final chorus expands) — a flat, single-energy description undersells the song.
-5. Repetition and variation: the chorus repeats, but the final chorus should feel bigger or
-   transformed, not identical.
-6. Motif development: a strong small idea (2-5 notes, a phrase, a rhythmic cell) developed through
-   the song beats constantly introducing new material.
-7. Arrangement as form: instrument density, register, and vocal layering should audibly change
-   between sections — arrangement is heard structure, not decoration.
+**Core principles**: form = distinct section functions (verse=initiation, pre-chorus=buildup,
+chorus=arrival, bridge=contrast, final chorus=expanded return); a clear hook (melodic/lyrical/
+rhythmic/harmonic); prosody (lyric, melody, rhythm, harmony pointing the same emotional direction);
+tension-and-release energy shape across sections, not one flat energy; final chorus bigger/
+transformed, not a repeat; a small motif developed, not constant new material; arrangement as
+audible structure (density/register/layering changes by section).
 
-**Genre-specific topline guidance** — apply whichever is relevant to `musicalIdentity.genres`:
-- Pop: hook-first, identity established in the first ~30s, a chorus that's genuinely singable.
-- Ballad: emotional credibility over vocal range for its own sake; high notes must feel earned;
-  the final chorus's expansion is the payoff.
-- R&B: vocal rhythm, harmonic color, and ad-libs carry more weight than a straight melodic line.
-- Rock: riff and energy contrast — a held-back verse makes an opened-up chorus land.
-- K-pop: large section contrast, often multiple hooks (verse hook, pre-chorus lift, chorus hook,
-  post-chorus hook) each doing different work.
-- OST/cinematic pop: scene and emotional arc over sheer loudness; the chorus should evoke an image.
+**Genre topline** (apply whichever matches `musicalIdentity.genres`): Pop=hook-first, fast
+identity, singable chorus. Ballad=earned high notes, final-chorus payoff. R&B=vocal rhythm/
+ad-libs over straight melody. Rock=riff + verse/chorus energy contrast. K-pop=multiple
+distinct hooks per section. OST/cinematic=emotional image over loudness.
 
-**AI-generation-specific advice from the same document** (directly about writing prompts like this
-one): name sections explicitly rather than leaving structure implicit; state each section's
-function, not just its name; specify repetition *and* variation explicitly ("repeat the hook, but
-make the final chorus richer with harmony vocals"); specify arrangement density changes explicitly
-("start sparse, build gradually, open fully in the chorus"); avoid stacking more than 2-3 genres in
-one description — "Korean indie pop ballad + cinematic OST" is coherent, "EDM + jazz + metal +
-trot + orchestral" dilutes the result.
+**AI-prompting advice from the same source**: name sections explicitly; state each section's
+function; specify repetition *and* variation explicitly (e.g. "final chorus adds harmony
+vocals"); specify density change explicitly ("sparse start, builds, opens in chorus"); don't
+stack more than 2-3 genres.
 
 ## Theory warnings — address every `warning`/`blocking` one
 

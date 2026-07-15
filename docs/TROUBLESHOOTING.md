@@ -700,3 +700,31 @@ this as a hard production guarantee, replace the in-memory `Map` with a shared s
 KV or Upstash Redis) — tracked in `IMPLEMENTATION_PLAN.md` as a named pre-deployment follow-up, not
 silently assumed to be already solved.
 
+### A single retry compounded a slow demo request into 3-6 minute waits (ADR-049)
+
+**Symptom:** Right after ADR-048 shipped (theory-grounded compile prompt), the demo started
+producing Mock's generic template output again for a specific real query, and separately some
+requests were observed taking as long as 6 minutes before returning anything.
+
+**Cause:** `GEMINI_REQUEST_OPTIONS.maxRetries: 1` (`resilience.ts`) meant a request that hit the
+90s timeout would retry the *identical* request once, doubling worst-case wait to ~180s for the
+compile call alone — and since the demo also made a separate real evaluator call at the time
+(before ADR-049 removed it), a compile-timeout-plus-retry followed by an evaluate-timeout-plus-retry
+could compound to ~360s (confirmed via a `6.0min` log entry) before silently falling back to Mock
+in development. The user only saw generic Mock output with no indication anything had failed.
+
+**Fix:** `maxRetries` lowered to `0` (a retry of an already-timed-out identical request rarely
+helps); the demo's evaluator call was removed entirely since its result (`promptQuality`) is never
+displayed in the UI, cutting a whole redundant real-Gemini round-trip; the ADR-048 theory-grounding
+prompt section was trimmed ~40% to reduce input size. General lesson: when a system prompt grows
+for good reason (real content grounding), immediately re-check whether every downstream real-API
+call in the same request path is actually necessary — a "free" second call that's simply unused
+becomes a real liability once individual call latency rises.
+
+**Not fully resolved — disclosed, not hidden:** the user's own original bilingual/dual-vocal test
+sentence still sometimes hit the 90s timeout even after all three fixes, while a different, equally
+realistic idea succeeded in 26.5s immediately after — confirming this wasn't a session-wide API
+slowdown, just that specific unusually demanding requests can still occasionally exceed the budget.
+Worst-case wait is now capped at 90s (not 180-360s), and typical-case latency measurably improved,
+but a guaranteed floor for every possible input isn't something a prompt-side fix can promise.
+

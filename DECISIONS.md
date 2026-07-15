@@ -1474,6 +1474,66 @@ that ADR.
 
 ---
 
+## ADR-049 — Demo latency/reliability fix: drop the wasted evaluator call, single-attempt timeout, leaner theory prompt
+
+- Status: Accepted
+- Date: 2026-07-15
+
+### Decision
+
+Live-testing right after ADR-048 shipped surfaced a real problem: the user reported the demo
+producing Mock's generic template output again ("Pop at up-tempo, familiar with one distinctive
+twist..."). Server logs confirmed this was a genuine `[GeminiPromptCompiler] compile failed,
+falling back to Mock in development: Request timed out` — the enriched theory-grounded prompt was
+sometimes pushing the real compile call itself past the 90s timeout, and with `maxRetries: 1`, a
+single retry of the identical slow request compounded worst-case wait to 3-6 minutes before the
+(silent, dev-only) Mock fallback. The user also asked for a 3x+ real speed improvement.
+
+Three changes, in order of impact:
+
+1. **`src/app/api/demo/compile/route.ts`**: the demo now always uses `MockPromptEvaluator` for
+   Stage F, even when Gemini is configured — `promptQuality` is never displayed anywhere in
+   `DemoForm.tsx`, so the second sequential real Gemini call for it was pure wasted latency (and a
+   second point of timeout failure) for zero user-visible benefit. Authenticated compiles
+   (`src/lib/compilerDeps.ts`) are completely unaffected and still get a real evaluator.
+2. **`src/llm/gemini/resilience.ts`**: `GEMINI_REQUEST_OPTIONS.maxRetries` lowered `1` → `0`. A
+   timed-out 90s request retrying the *identical* request rarely succeeds meaningfully faster —
+   observed compounding a single failure into 3-6 minute waits. Failing once at 90s (dev-fallback
+   or a clear production error) beats doubling the wait for an unlikely-to-help retry.
+3. **`provider-compiler.system.md`**: the ADR-048 "Grounding in real songwriting pedagogy" section
+   was rewritten roughly 40% shorter — dense bullet-style principles instead of full sentences per
+   item — keeping the same citations and substance while reducing input-prompt size.
+
+### Verification (honest, including what did *not* fully resolve)
+
+- A fresh, different, realistic idea ("봄날 벚꽃길을 걷는 설렘, 인디팝, 밝은 분위기") compiled via
+  real Gemini in **26.5s** with genuinely good output ("Indie Pop, Spring Acoustic, Sweet Airy
+  Vocals, Upbeat, Bright, Melodic") — confirming the combined fixes measurably help the typical
+  case (well under half of the ~70s ADR-048 baseline, and comfortably under the 90s timeout).
+- **The user's own original test sentence** ("기차역에서의 씁쓸한 이별, 남녀 대화 형식, kpop과
+  jpop의 융합" — a bilingual, dual-vocal-perspective, two-genre-fusion request) **still sometimes
+  hit the 90s timeout and fell back to Mock even after all three fixes**, confirmed via a fresh
+  fetch with `elapsedMs: 90247` and a repeat `[GeminiPromptCompiler] ... timed out` log line. This
+  specific request appears to be an unusually demanding edge case for the model (bilingual +
+  dialogue-structure + genre-fusion reasoning simultaneously), not evidence that the general fix
+  didn't work. Confirmed this wasn't a session-wide quota/API slowdown by testing a fresh, different
+  idea immediately after, which succeeded quickly.
+- **Honest conclusion, not oversold**: general demo latency and worst-case reliability are
+  measurably improved (typical case ~26-40s vs. the previous ~37-70s+, worst-case failure capped at
+  90s instead of 180-360s). A guaranteed 3x floor for *every* input, including unusually demanding
+  ones, is not something this fix (or any prompt-side fix) can promise — that remains bounded by
+  real Gemini's variable reasoning time for harder requests. Not silently claiming otherwise.
+
+### Reason
+
+Removing genuinely wasted work (an evaluator call whose result is never shown) and avoiding a
+retry that mostly just doubles wait time on an already-slow request are both unambiguous, no-
+downside wins. Trimming the prompt reduces cost without reducing substance. None of these
+required trading away the just-added theory grounding (ADR-048) to gain speed — the tension between
+"faster" and "richer" was resolved by cutting waste, not by cutting quality.
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:

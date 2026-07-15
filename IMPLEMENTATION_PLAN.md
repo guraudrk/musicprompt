@@ -712,7 +712,22 @@ Each requires official capability verification and tests.
     harmonic movement) versus the pre-change output; confirmed the animation genuinely animates via
     computed-style diffing. Disclosed cost: latency rose from ~37s to ~70s for the same call
     (already-accepted trade-off per ADR-047's instant-preview UX). No schema/test changes.
-22. **Next actual work**: replacing the in-memory demo rate limiter with a shared store (Vercel
+22. ~~Fix demo latency/reliability regression from ADR-048.~~ Done — ADR-049. User reported the
+    demo showing Mock's generic output again and demanded 3x+ real speed; server logs confirmed a
+    genuine `Request timed out` fallback, compounded by `maxRetries: 1` into 3-6 minute worst-case
+    waits (compile timeout+retry, then evaluate timeout+retry). Fixed three things: demo now always
+    uses `MockPromptEvaluator` (its `promptQuality` output is never shown in `DemoForm.tsx`, so the
+    real evaluator call was pure wasted latency and a second failure point); `maxRetries` lowered
+    1→0 (a retry of an identical timed-out request rarely helps, and doubling the wait is worse
+    than failing once); the ADR-048 theory-grounding prompt trimmed ~40% shorter. Live-verified
+    honestly: a fresh realistic idea compiled via real Gemini in 26.5s (vs. ~70s baseline) with
+    genuinely good output, confirming the fix helps the typical case — but the user's own original
+    bilingual/dual-vocal test sentence still occasionally hit the 90s timeout even after all three
+    fixes (confirmed not a session-wide slowdown by testing a different idea immediately after,
+    which succeeded quickly). Worst-case wait capped at 90s instead of 180-360s; a guaranteed speed
+    floor for every possible input isn't something a prompt-side fix can promise, and this was
+    stated plainly rather than oversold.
+23. **Next actual work**: replacing the in-memory demo rate limiter with a shared store (Vercel
     KV/Upstash Redis) before actual Vercel deployment is now a concrete, well-scoped pre-deployment
     task (ADR-046); the larger structure/emotionCurve/contrastPlan/hookPlan inference
     follow-up to item 17 is now a real, well-scoped candidate; translating `/dashboard` and the
