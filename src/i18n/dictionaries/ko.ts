@@ -62,6 +62,8 @@ export const ko: Dictionary = {
     style: "스타일:",
     lyrics: "가사:",
     noLyricsFallback: "실제 가사 초안은 회원가입 후 Gemini로 생성됩니다 — 무료 데모는 스타일 방향만 컴파일합니다.",
+    previewBadge: "빠른 미리보기",
+    upgradingNotice: "실제 Gemini + 작곡 이론으로 다듬는 중...",
     signUpLink: "회원가입",
     upsellSuffix: "하면 이 프로젝트를 저장하고 실제 Gemini 출력으로 Safe / Balanced / Bold를 사용할 수 있습니다.",
   },

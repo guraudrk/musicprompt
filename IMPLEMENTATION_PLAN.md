@@ -690,7 +690,16 @@ Each requires official capability verification and tests.
     in-memory rate-limit store only works correctly within a single process — a shared store
     (Vercel KV/Upstash) is needed before the "5/hour" limit can be a hard guarantee across Vercel's
     serverless instances; tracked as a real pre-deployment follow-up, not solved yet.
-20. **Next actual work**: replacing the in-memory demo rate limiter with a shared store (Vercel
+20. ~~Demo UX: instant local preview + async upgrade to the real Gemini result.~~ Done — ADR-047.
+    User asked for sub-3-second demo response; confirmed not achievable with real Gemini + theory
+    (already fastest model tier, 2 sequential real calls per request, ~15-40s+ observed floor).
+    `DemoForm.tsx` now calls the same `extractHints()` the server uses, client-side, the instant
+    Generate is clicked — a "Quick preview" badge + guess appears well under 1s, with an
+    "upgrading" notice while the real call is in flight, replaced by the real result once it
+    resolves. Pure client-side UX change, no backend/schema change. New dictionary keys
+    (`previewBadge`/`upgradingNotice`, en/ko/ja). Live-verified with the user's exact idea:
+    screenshotted both the instant-preview and final-result states.
+21. **Next actual work**: replacing the in-memory demo rate limiter with a shared store (Vercel
     KV/Upstash Redis) before actual Vercel deployment is now a concrete, well-scoped pre-deployment
     task (ADR-046); the larger structure/emotionCurve/contrastPlan/hookPlan inference
     follow-up to item 17 is now a real, well-scoped candidate; translating `/dashboard` and the

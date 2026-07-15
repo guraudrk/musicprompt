@@ -62,6 +62,8 @@ export const en: Dictionary = {
     style: "Style:",
     lyrics: "Lyrics:",
     noLyricsFallback: "Sign up to generate real lyric drafts with Gemini — the free demo only compiles style direction.",
+    previewBadge: "Quick preview",
+    upgradingNotice: "Refining with real Gemini + composition theory...",
     signUpLink: "Sign up",
     upsellSuffix: "to save this project and unlock Safe / Balanced / Bold with real Gemini output.",
   },

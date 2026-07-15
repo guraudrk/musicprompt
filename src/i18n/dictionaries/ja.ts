@@ -62,6 +62,8 @@ export const ja: Dictionary = {
     style: "スタイル:",
     lyrics: "歌詞:",
     noLyricsFallback: "実際の歌詞ドラフトはサインアップ後にGeminiで生成されます — 無料デモはスタイルの方向性のみをコンパイルします。",
+    previewBadge: "クイックプレビュー",
+    upgradingNotice: "実際のGeminiと作曲理論で仕上げ中...",
     signUpLink: "新規登録",
     upsellSuffix: "すると、このプロジェクトを保存し、実際のGemini出力でSafe / Balanced / Boldを使えるようになります。",
   },

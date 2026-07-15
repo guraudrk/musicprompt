@@ -1360,6 +1360,52 @@ Gemini-selection code path in the codebase.
 
 ---
 
+## ADR-047 — Demo UX: instant local preview, then async upgrade to the real Gemini result
+
+- Status: Accepted
+- Date: 2026-07-15
+
+### Decision
+
+The user asked for the demo to respond within 3 seconds. Investigated and confirmed this is not
+achievable while keeping real Gemini + full theory-grounded output: `GEMINI_MODEL` is already the
+fastest tier (`gemini-3.5-flash`), and one demo request already makes two sequential real Gemini
+calls (compile, then a separate evaluator call) — the observed real-world floor for this
+schema/prompt complexity is ~15-40s, sometimes 2+ minutes under latency variance (ADR-045).
+Presented this constraint and three options; user chose **instant local preview + async upgrade**:
+show a fast on-device guess immediately, then swap in the real result once it arrives.
+
+`DemoForm.tsx` now calls `extractHints()` (`src/domain/songDesignSpec/extractHints.ts` — already
+pure, dependency-free, no server-only imports) directly client-side the moment Generate is
+clicked, before the `fetch` to `/api/demo/compile` even starts. This reuses the exact same
+deterministic function the server also calls — no duplicated logic, no drift risk. A "Quick
+preview" badge + genre/tempo/vocal guess renders within the same interaction (verified: appears
+well under 1s), with a "refining with real Gemini + composition theory..." notice below it while
+the real call is in flight; the real result replaces the preview panel once it resolves. On error
+(e.g. rate-limited), the preview stays visible rather than the UI going blank.
+
+### Reason
+
+3-second real-Gemini-plus-theory output is not physically achievable with current tooling without
+sacrificing the very quality the last two ADRs (045/046) were about adding. Rather than either
+lying about latency or reverting to Mock-only speed, this addresses the actual user need (don't
+stare at a blank "Generating..." for 30+ seconds) without touching backend correctness at all —
+purely a perceived-responsiveness improvement. This is a reusable pattern worth naming: "instant
+deterministic guess now, real-AI upgrade when ready" applies anywhere else in the app a real Gemini
+call is on the critical path of a first-time interaction.
+
+### Verification
+
+Live-verified against the real Gemini-backed dev server with the user's exact reported idea:
+screenshotted the instant-preview state (badge + "K-pop, J-pop" guess + upgrading notice, while the
+button still reads "Generating...") and the final state (badge gone, full real Style/Lyrics —
+genuine male/female duet Korean-context lyrics matching the request — in its place), confirming
+the swap happens correctly. `pnpm typecheck`/`lint`/`build` pass; no new automated test added (this
+repo has no component-test infra — `vitest.config.ts` uses `environment: "node"`, consistent with
+existing practice of live/screenshot verification for UI-only changes).
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:

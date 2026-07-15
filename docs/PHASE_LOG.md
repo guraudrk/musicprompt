@@ -1380,3 +1380,64 @@ serverless limitation, and the reasoning for lifting the Mock-only guarantee).
   follow-up) — still pending.
 - Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first-sixth slices is still
   pending.
+
+---
+
+## Demo UX: instant preview + async upgrade (2026-07-15, ADR-047)
+
+### 한글 요약
+
+- **왜 만들었나**: 사용자가 "3초 안에 응답했으면 좋겠다"고 요청했습니다. 확인해보니 이미 가장
+  빠른 모델(`gemini-3.5-flash`)을 쓰고 있고, 데모 한 번에 실제로는 Gemini 호출이 2번(컴파일 +
+  평가) 일어나서, 실제로 관찰되는 최소 응답 시간이 15~40초, 길면 몇 분까지도 걸립니다 — 이론까지
+  반영된 진짜 품질을 유지하면서 3초 안에 답하는 건 물리적으로 불가능하다고 솔직하게 설명했고,
+  세 가지 대안을 제시해 사용자가 "즉시 미리보기 + 비동기 업그레이드"를 선택했습니다.
+- **무엇을 만들었나**: 서버가 쓰는 것과 완전히 동일한 `extractHints()` 함수를 클라이언트에서도
+  그대로 불러와서, "Generate" 버튼을 누르는 즉시(1초 이내) 장르·템포·보컬에 대한 간단한 추측을
+  "빠른 미리보기" 배지와 함께 보여줍니다. 그 아래에는 "실제 Gemini + 작곡 이론으로 다듬는 중..."
+  안내 문구가 뜨고, 실제 결과가 도착하면(보통 15~40초, 가끔 그 이상) 미리보기 자리를 진짜 결과로
+  교체합니다. 백엔드나 스키마는 전혀 건드리지 않은 순수 프론트엔드 체감 속도 개선입니다.
+- **라이브 검증**: 사용자가 실제로 입력했던 문장으로 확인했습니다 — 버튼을 누르자마자 "QUICK
+  PREVIEW · K-pop, J-pop" 배지가 뜨고 "Generating..." 버튼과 함께 안내 문구가 표시됐으며, 39.8초
+  뒤 실제 Gemini 결과(요청하신 남녀 대화 형식의 진짜 가사 포함)로 자연스럽게 교체되는 걸 스크린샷
+  으로 확인했습니다.
+
+### What shipped
+
+- `src/app/DemoForm.tsx` — new `preview: ExtractedHints | null` state; `extractHints(idea)` called
+  client-side immediately in `handleGenerate()`, before `await fetch(...)`; renders a
+  "Quick preview" badge + guess (skipped entirely when nothing recognizable is found) plus an
+  "upgrading" notice while `loading`, replaced by the existing full result panel once the real
+  response arrives; preview stays visible on error instead of the UI going blank.
+- `src/i18n/dictionaries/{types,en,ko,ja}.ts` — new `demoForm.previewBadge`/`upgradingNotice` keys,
+  real translations in all three locales.
+- `src/app/Hero.module.css` — new `.demoPreviewBadge` class (reuses existing color tokens).
+
+### Live verification
+
+- Screenshotted the instant-preview state (badge + guess + upgrading notice, "Generating..."
+  button) and the final-result state (badge gone, real Style/Lyrics in place) for the user's exact
+  reported idea — confirmed the swap happens correctly. One run's real compile took ~2 minutes
+  (consistent with already-documented ADR-045 latency variance); a repeat run completed in 39.8s —
+  variance itself unaffected by this change, only the perceived experience while waiting improved.
+
+### Verification at time of this entry
+
+- `pnpm typecheck`, `pnpm lint`, `pnpm build` — pass
+- `pnpm test` — 162/162 pass (unchanged — no new automated test; this repo has no component-test
+  infra, consistent with existing practice of live/screenshot verification for UI-only changes)
+- Live walkthrough (instant preview + real-result swap) — pass
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-047 (instant-preview UX pattern, reasoning, and why 3s isn't achievable with
+real Gemini + theory intact).
+
+### Known gaps carried forward
+
+- Shared-store-backed rate limiting (Vercel KV/Upstash) before actual Vercel deployment.
+- 3-way-concurrent Safe/Balanced/Bold real-Gemini latency/timeout risk — still not resolved.
+- Structure/emotionCurve/contrastPlan/hookPlan/compositionTheory inference (spec-interpreter
+  follow-up) — still pending.
+- Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first-sixth slices is still
+  pending.

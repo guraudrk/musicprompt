@@ -55,6 +55,8 @@ export interface Dictionary {
     style: string;
     lyrics: string;
     noLyricsFallback: string;
+    previewBadge: string;
+    upgradingNotice: string;
     signUpLink: string;
     upsellSuffix: string;
   };
