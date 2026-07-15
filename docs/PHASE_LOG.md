@@ -1617,3 +1617,51 @@ See `DECISIONS.md` ADR-050 and ADR-051.
   compressing the system instruction further) are recorded in ADR-051 but not yet attempted.
 - Everything already carried forward from ADR-049 (shared-store rate limiting, 3-way-concurrent
   latency risk, spec-interpreter inference follow-up, Phase 0-7 open items) is still pending.
+
+## Genre-targeted theory excerpt + a Gemini-side capacity finding (2026-07-15, ADR-052)
+
+### Why
+
+The user rejected the "dump the whole 38KB theory document in" idea floated as a follow-up to
+ADR-051, correctly pointing out it would likely make the just-diagnosed latency problem worse, not
+better. The agreed alternative: keep the instruction small, but make the existing "Genre topline"
+excerpt (theory doc §8) target only the genre(s) actually declared in the input, instead of always
+listing all six genres' guidance regardless of relevance.
+
+### What shipped
+
+New `src/llm/gemini/theoryExcerpts.ts` (`selectGenreTopline`) matches declared `musicalIdentity.
+genres` tags against theory-doc §8 excerpts (Pop/Ballad/R&B/Rock/K-pop/OST-cinematic), case-
+insensitively, with alias handling (`k-pop`/`kpop`, `ost`/`cinematic`) and no duplicate lines when
+multiple genres match. Falls back to the full six-genre list — the previous, always-safe behavior
+— when nothing matches or no genre is declared, so unusual inputs never regress to zero guidance.
+`provider-compiler.system.md`'s static genre line became a `{{GENRE_TOPLINE}}` placeholder,
+substituted per call in `geminiPromptCompiler.ts`. 4 new unit tests; all 173 project unit tests
+pass; typecheck/lint clean.
+
+### An unexpected, more important finding
+
+Live-verifying this change (a single, deliberately limited test per the user's "don't over-test"
+instruction) surfaced something new: instead of another silent 90s timeout, the server log recorded
+an explicit Gemini-side error — `500 gemini-3.5-flash is currently experiencing high demand,
+spikes in demand are usually temporary. Please try again later.` This is Google's own backend
+reporting model-level capacity pressure, not a client-side hang or anything in this project's
+request shape. It suggests a meaningful share of the reliability problems chased across
+ADR-049/050/051 may be genuine, time-varying Gemini demand rather than something fully fixable
+client-side. The call still fell back to Mock, so ADR-052's actual effect on live output quality
+remains unverified — recorded honestly rather than assumed fixed.
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-052.
+
+### Known gaps carried forward
+
+- ADR-052's live quality effect is unverified (every recent live attempt has hit Mock fallback, for
+  different underlying reasons — timeout, then an explicit Gemini demand error).
+- Whether the ADR-051 array-hang finding and this ADR-052 demand-error finding are the same
+  underlying cause, two separate causes, or one masking the other, is not yet disentangled.
+- Candidate mitigation if Gemini demand pressure recurs: temporarily switching `GEMINI_MODEL` to
+  the documented `gemini-2.5-flash` GA-stable alternative to check whether it is less congested —
+  not yet attempted, paused per user decision along with further live retries.
+- Everything already carried forward from ADR-049/050/051 remains pending.

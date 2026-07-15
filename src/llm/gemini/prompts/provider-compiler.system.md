@@ -39,10 +39,7 @@ tension-and-release energy shape across sections, not one flat energy; final cho
 transformed, not a repeat; a small motif developed, not constant new material; arrangement as
 audible structure (density/register/layering changes by section).
 
-**Genre topline** (apply whichever matches `musicalIdentity.genres`): Pop=hook-first, fast
-identity, singable chorus. Ballad=earned high notes, final-chorus payoff. R&B=vocal rhythm/
-ad-libs over straight melody. Rock=riff + verse/chorus energy contrast. K-pop=multiple
-distinct hooks per section. OST/cinematic=emotional image over loudness.
+**Genre topline** (matched to this spec's `musicalIdentity.genres`, ADR-052): {{GENRE_TOPLINE}}
 
 **AI-prompting advice from the same source**: name sections explicitly; state each section's
 function; specify repetition *and* variation explicitly (e.g. "final chorus adds harmony

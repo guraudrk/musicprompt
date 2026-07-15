@@ -5,6 +5,7 @@ import { CompilerOutputSchema, type CompilerOutput } from "@/domain/promptPackag
 import { getGeminiEnvConfig } from "@/lib/env";
 import { GeminiLLMProvider } from "./geminiLLMProvider";
 import { readSystemInstructionTemplate } from "./readTemplate";
+import { selectGenreTopline } from "./theoryExcerpts";
 
 const PROVIDER_COMPILER_SYSTEM_INSTRUCTION = readSystemInstructionTemplate("provider-compiler.system.md");
 const PROMPT_REPAIR_SYSTEM_INSTRUCTION = readSystemInstructionTemplate("prompt-repair.system.md");
@@ -19,9 +20,14 @@ export class GeminiPromptCompiler implements PromptCompiler {
   }
 
   async compile(input: ProviderCompilerInput): Promise<CompilerOutput> {
+    const genreTags = input.spec?.musicalIdentity?.genres?.map((g) => g.tag) ?? [];
+    const systemInstruction = PROVIDER_COMPILER_SYSTEM_INSTRUCTION.replace(
+      "{{GENRE_TOPLINE}}",
+      selectGenreTopline(genreTags),
+    );
     return this.llm.generateStructured({
       task: "compile-prompt-package",
-      systemInstruction: PROVIDER_COMPILER_SYSTEM_INSTRUCTION,
+      systemInstruction,
       payload: input,
       schema: CompilerOutputSchema,
     });

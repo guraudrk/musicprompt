@@ -749,7 +749,18 @@ Each requires official capability verification and tests.
     result**: a live retest through the actual demo endpoint after this fix still hit the 90s
     timeout — the fix is not confirmed to fully resolve the hang. Kept anyway as a reasonable
     schema-hygiene improvement; further live diagnosis paused (time/cost) per user decision.
-25. **Next actual work**: replacing the in-memory demo rate limiter with a shared store (Vercel
+25. ~~Target genre-topline theory guidance to the declared genre(s) instead of listing all six.~~
+    Done — ADR-052. User rejected dumping the full 38KB theory document into the system
+    instruction (correctly noting it would likely worsen the ADR-051 latency problem, not fix it),
+    proposing instead that only the genre(s) actually present in `musicalIdentity.genres` get their
+    matching guidance from theory-doc §8. New `src/llm/gemini/theoryExcerpts.ts` does this with a
+    safe fallback to the full list for unrecognized/absent genres; 4 new unit tests, 173 total pass.
+    Live-verifying this surfaced a materially different signal than prior attempts: an explicit
+    Gemini-side `500 ... currently experiencing high demand` error, not a silent timeout — meaning
+    at least some of the chased unreliability may be genuine, time-varying Gemini capacity
+    pressure rather than something client-side fixable. The call still fell back to Mock, so this
+    change's live quality effect remains unverified; further live retries paused per user decision.
+26. **Next actual work**: replacing the in-memory demo rate limiter with a shared store (Vercel
     KV/Upstash Redis) before actual Vercel deployment is now a concrete, well-scoped pre-deployment
     task (ADR-046); the larger structure/emotionCurve/contrastPlan/hookPlan inference
     follow-up to item 17 is now a real, well-scoped candidate; translating `/dashboard` and the

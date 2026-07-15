@@ -1678,6 +1678,66 @@ mitigation honestly rather than claiming a fix that live evidence didn't fully s
 
 ---
 
+## ADR-052 — Target genre-topline theory guidance to the actual declared genre(s), and a Gemini-side capacity finding
+
+- Status: Accepted
+- Date: 2026-07-15
+
+### Decision
+
+The user pushed back on the ADR-051 "dump the whole theory document in" idea (correctly noting
+the full `top_music_school_general_composition.txt` is 38KB vs. the current curated 6.4KB
+instruction, and that our own ADR-051 findings suggested a bigger instruction would likely worsen,
+not fix, the latency problem). The agreed middle ground: keep the instruction small, but make the
+already-embedded "Genre topline" excerpt (§8 of the theory document) *targeted* to the genre(s)
+actually present in `spec.musicalIdentity.genres`, instead of always listing all six genres'
+guidance regardless of relevance.
+
+### Implementation
+
+- New `src/llm/gemini/theoryExcerpts.ts`: `selectGenreTopline(genreTags: string[])` maps declared
+  genre tags (case-insensitive; `k-pop`/`kpop` and `ost`/`cinematic` both recognized) to their
+  matching §8 excerpt, joining multiple matches without duplicates. If nothing matches (an unusual
+  or unrecognized genre, or no genre declared at all), it falls back to the full six-genre list —
+  the previous, always-safe behavior — rather than ever regressing to zero guidance.
+- `provider-compiler.system.md`: the static "Genre topline" line is now a `{{GENRE_TOPLINE}}`
+  placeholder.
+- `geminiPromptCompiler.ts`'s `compile()` substitutes the placeholder per call using
+  `input.spec.musicalIdentity.genres`, with optional chaining so a minimal/malformed test input
+  degrades to the safe fallback rather than throwing.
+- New `tests/unit/theoryExcerpts.test.ts` (4 tests: single-genre match, multi-genre dedup,
+  unrecognized-genre fallback, no-genre fallback). All 173 project unit tests pass.
+
+### A Gemini-side finding, not a code finding
+
+Live-verifying this change surfaced a materially different signal than every prior test in ADR-049
+through ADR-051: instead of a silent 90s client-side timeout, the server log captured an explicit
+Gemini-side error —
+`500 gemini-3.5-flash is currently experiencing high demand, spikes in demand are usually
+temporary. Please try again later.` This is Google's own backend reporting model-level capacity
+pressure, not a client hang, a malformed request, or anything attributable to this project's code
+or schema shape. It suggests at least some (possibly much) of the unreliability chased across
+ADR-049/050/051 may be genuine, time-varying Gemini capacity constraints rather than something
+fully fixable from this side.
+
+The call still fell back to Mock, so this change's actual effect on live output quality remains
+unverified — recorded honestly rather than assumed. Per the user's decision, further live retries
+are paused for now; this is logged as an external dependency condition to revisit once Gemini
+demand is no longer elevated (candidate mitigation if it recurs: temporarily switching
+`GEMINI_MODEL` to the documented `gemini-2.5-flash` GA-stable alternative to see whether it is less
+congested).
+
+### Reason
+
+Narrowing the genre excerpt to what's actually relevant is a small, safe, no-downside improvement
+in signal-to-noise (the model sees only applicable guidance, not five other genres' advice it must
+ignore) with a graceful fallback for anything unrecognized. Documenting the demand-side finding
+honestly, rather than folding it silently into "still investigating latency," matters because it
+changes where future effort should go: retrying the same client-side mitigations further has
+diminishing returns if the bottleneck is Google's current model-level capacity.
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:
