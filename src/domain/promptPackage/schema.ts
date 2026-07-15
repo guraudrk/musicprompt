@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { PromptQualityReportSchema } from "@/domain/evaluation/schema";
+import { TheoryEngineNameSchema } from "@/domain/songDesignSpec/theory";
 
 /** Bump when MusicAIPromptPackageSchema changes materially; persisted alongside compiled packages (IMPLEMENTATION_PLAN.md §3.6). */
-export const SCHEMA_VERSION = "1";
+export const SCHEMA_VERSION = "2";
 
 export const StrategySchema = z.enum(["safe", "balanced", "bold"]);
 export type Strategy = z.infer<typeof StrategySchema>;
@@ -46,6 +47,21 @@ export const RevisionLeverSchema = z.object({
 });
 export type RevisionLever = z.infer<typeof RevisionLeverSchema>;
 
+/**
+ * Self-reported, deterministically-checked link between a theory-engine warning
+ * (`spec.compositionTheory.engineWarnings`, already dismissal-filtered) and how this specific
+ * compile addressed it — mirrors the same traceability pattern already proven for
+ * `LyricsDraft.techniquesUsed` (src/lyrics/validateDraftSet.ts). `message` must match an actual
+ * warning verbatim (checked by src/compiler/validateTheoryAddressal.ts); `resolution` must state
+ * either what changed to address it or an honest reason it couldn't be — never a vague non-answer.
+ */
+export const TheoryAddressalSchema = z.object({
+  engine: TheoryEngineNameSchema,
+  message: z.string().min(1),
+  resolution: z.string().min(1),
+});
+export type TheoryAddressal = z.infer<typeof TheoryAddressalSchema>;
+
 export const MusicAIPromptPackageSchema = z.object({
   providerId: z.string().min(1),
   providerDisplayName: z.string().min(1),
@@ -61,6 +77,7 @@ export const MusicAIPromptPackageSchema = z.object({
   warnings: z.array(z.string()),
   toolInstructions: z.array(z.string()),
   revisionLevers: z.array(RevisionLeverSchema),
+  theoryAddressal: z.array(TheoryAddressalSchema),
 
   promptQuality: PromptQualityReportSchema,
   copyBundle: z.string(),

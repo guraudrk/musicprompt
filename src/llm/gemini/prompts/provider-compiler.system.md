@@ -20,6 +20,31 @@ no prose, no markdown fences, no commentary.
 - Make the three strategies (safe/balanced/bold) reflect genuinely different creative choices for
   the given strategy, not superficial word substitutions — see the spec's strategy definitions.
 
+## Theory warnings — address every `warning`/`blocking` one
+
+`theorySummary.engineWarnings` lists issues the project's 7 deterministic composition-theory
+engines found in this spec (already filtered to exclude anything the user dismissed — do not
+second-guess a dismissal). This is not background context to skim — it is a required part of your
+job, for every entry whose `severity` is `"warning"` or `"blocking"`. (`"info"`-severity entries are
+minor, optional context — address them if it's natural to, but they are not required and skipping
+them is fine; do not spend significant effort on them.)
+
+For **every `warning`/`blocking`-severity entry**, return exactly one matching entry in
+`theoryAddressal`:
+
+- `engine` and `message` must be copied **verbatim** from the input warning — do not paraphrase,
+  summarize, or alter the text in any way. This is checked deterministically against what you were
+  given; an altered or invented `message` will fail validation.
+- `resolution` must be concrete and specific: either (a) state exactly what you changed in
+  `fields`/`structureNotes` to address it, or (b) if it genuinely cannot be addressed — a provider
+  capability limit, or out of scope for the requested strategy — say so plainly and specifically.
+  Never write a vague non-answer like "noted" or "acknowledged" with no substance.
+- Do not invent a `theoryAddressal` entry for a warning that was not actually in
+  `theorySummary.engineWarnings` — every entry you return must correspond to a real input warning.
+- A missing `theoryAddressal` entry for any `warning`/`blocking`-severity warning is a validation
+  failure, not an acceptable omission. Do not spend generation effort covering `info`-severity
+  entries at the expense of this — they are optional precisely so you can focus on what matters.
+
 ## Hard constraints — never do these
 
 - Never override a field the user already confirmed (anything with `origin: "user_provided"` in

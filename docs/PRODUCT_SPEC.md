@@ -425,6 +425,8 @@ Gemini responsibilities:
 - Produce a concise and a detailed version where appropriate
 - Preserve locked lyrics and phrases
 - Produce revision levers
+- Address every active (non-dismissed) composition-theory engine warning with a traceable
+  `theoryAddressal` entry (verbatim engine/message, concrete resolution) — never silently ignore one
 - Return only the agreed JSON structure
 
 Gemini must not:
@@ -451,6 +453,7 @@ Validate:
 - Prompt overload
 - Empty or duplicated fields
 - Unsupported-intent preservation
+- Every active theory-engine warning has a matching, traceable `theoryAddressal` entry
 
 #### Stage F — Independent evaluator
 
@@ -600,6 +603,13 @@ type MusicAIPromptPackage = {
     fieldPath: string;
     purpose: string;
     safeAdjustment: string;
+  }[];
+
+  // One entry required per active (non-dismissed) engineWarning — see Stage D/E below.
+  theoryAddressal: {
+    engine: string;
+    message: string;
+    resolution: string;
   }[];
 
   promptQuality: PromptQualityReport;

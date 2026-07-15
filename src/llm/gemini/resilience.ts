@@ -6,11 +6,14 @@ import { ApiError } from "@google/genai";
  * `GoogleGenAIRequestOptions` has `timeout`/`maxRetries`); we don't reimplement that. `maxRetries:
  * 1` caps retries so a flaky call never turns into a retry storm (IMPLEMENTATION_PLAN.md §3.7).
  *
- * `timeout: 60_000` — live-verified (docs/PHASE_LOG.md Phase 3 entry): a plain call took ~17s and
- * a small structured-output call took ~19s, and our `MusicAIPromptPackageSchema` is large/nested,
- * so 30s was too tight for three concurrent Safe/Balanced/Bold calls sharing rate limit headroom.
+ * `timeout: 90_000` — raised from 60s after ADR-045 (theoryAddressal): live-verified that requiring
+ * Gemini to produce a traceable, per-warning `theoryAddressal` entry for every active theory-engine
+ * warning measurably increases real response time enough to trip the previous 60s budget (observed
+ * all three concurrent Safe/Balanced/Bold calls timing out and dev-falling-back to Mock). This is
+ * the accepted cost of requiring genuine per-warning reasoning rather than an unenforced summary —
+ * see docs/TROUBLESHOOTING.md for the concrete before/after timing.
  */
-export const GEMINI_REQUEST_OPTIONS = { timeout: 60_000, maxRetries: 1 };
+export const GEMINI_REQUEST_OPTIONS = { timeout: 90_000, maxRetries: 1 };
 
 /**
  * Maps the SDK's `ApiError` (has a `.status` HTTP code) to a clearer, user-facing message for the

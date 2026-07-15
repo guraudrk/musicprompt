@@ -1199,6 +1199,92 @@ volume.
 
 ---
 
+## ADR-045 — Composition-theory engine warnings become genuinely load-bearing in compiled output
+
+- Status: Accepted
+- Date: 2026-07-15
+
+### Decision
+
+The user asked directly whether prompt generation is really based on the project's own
+composition/lyric theory. Investigation found lyric technique knowledge is genuinely load-bearing
+(`lyrics-draft.system.md` cites `user_lyrics_knowhow.txt` by name; `validateDraftSet.ts` checks
+`techniquesUsed` traceability), but the 7 composition-theory engines were only half-connected:
+`theorySummary.engineWarnings` genuinely reached Gemini in the request payload
+(`pipeline.ts` → `geminiPromptCompiler.ts` → `geminiLLMProvider.ts`), but `provider-compiler.
+system.md` never instructed Gemini to use it, Stage E validation never checked whether any warning
+was addressed, and the Mock compiler hardcoded `warnings: [], revisionLevers: []` — always empty
+regardless of what the engines actually found. The user confirmed this must be fixed for the
+product's core claim to be true.
+
+Added `theoryAddressal: TheoryAddressal[]` to `MusicAIPromptPackageSchema`
+(`src/domain/promptPackage/schema.ts`, `SCHEMA_VERSION` bumped `"1"` → `"2"`) — a self-reported,
+deterministically-checked link between a theory-engine warning and how this specific compile
+addressed it, mirroring the exact traceability pattern already proven for
+`LyricsDraft.techniquesUsed`:
+
+- `provider-compiler.system.md` gained a required "Theory warnings" section instructing Gemini to
+  return one `theoryAddressal` entry per active warning, with the `engine`/`message` copied
+  verbatim (so it can be matched deterministically) and a concrete `resolution` (what changed, or
+  an honest reason it couldn't be).
+- `src/compiler/validateTheoryAddressal.ts` (new) is the deterministic backstop, wired into
+  `pipeline.ts`'s Stage E `validatePackage()`: an unaddressed required warning is now a genuine
+  blocking validation failure, triggering the existing single-repair-pass mechanism (Stage G,
+  ADR-010) — not just inert context Gemini could silently ignore.
+- `mockOutputBuilders.ts` now actually populates `theoryAddressal` and the previously-always-empty
+  `warnings` field from the real `theorySummary`, instead of hardcoding empty arrays.
+- `ProjectEditor.tsx`'s results section gained a "Theory addressed" block per compiled package so
+  the user can see, for the first time, which theory findings were actually reflected.
+
+### Scope reduction after live-testing (real, disclosed cost)
+
+The first implementation required an addressal entry for **every** active warning regardless of
+severity. Live-verifying against real Gemini found this made compiles measurably and unacceptably
+slower: single-strategy calls that previously took ~17-25s (documented in ADR-003/Phase 3) now took
+~45-62s, and the three concurrent Safe/Balanced/Bold calls (which already share rate-limit headroom
+per the existing `resilience.ts` comment) frequently exceeded even a raised 90s SDK timeout,
+falling back to Mock in development for some strategies. Presented this trade-off to the user with
+concrete numbers; **user chose to restrict the mandatory requirement to `"warning"`/`"blocking"`
+severity only** — `"info"`-severity warnings (the majority in practice; minor stylistic notes like
+"no key/mode declared") remain visible in the existing Analyze UI but are not required to be
+addressed per-compile. This is implemented as a filter in `validateTheoryAddressal()` and mirrored
+in `mockOutputBuilders.ts`'s `buildTheoryAddressal()` and the system prompt's instructions.
+`GEMINI_REQUEST_OPTIONS.timeout` (`resilience.ts`) was also raised `60_000` → `90_000` as a modest
+buffer for the real, if reduced, extra reasoning cost.
+
+### Reason
+
+Composition theory that reaches the model but is never required to visibly shape the output is
+indistinguishable from decoration — the user judged this incompatible with the product's actual
+purpose. Reusing the lyrics-technique traceability pattern (rather than inventing a new mechanism)
+keeps the codebase's two "theory must be traceable in the output" implementations consistent.
+Restricting mandatory enforcement to substantive (`warning`/`blocking`) findings, rather than every
+minor `info` note, was chosen over silently accepting multi-minute compiles or reverting the
+feature — it preserves genuine enforcement for what matters while keeping real-world latency
+practical.
+
+### Verification
+
+Live-verified against the real Gemini-backed dev server via a single-strategy compile
+(`/api/projects/{id}/compile/generic`, avoiding 3-way concurrency contention for a clean signal):
+
+- A spec with no substantive theory issues correctly produced an **empty** `theoryAddressal` (no
+  fabricated busywork) in 62s.
+- A spec with 4 declared genres (tripping `SubtractionEngine`'s warning-severity "mixing this many
+  can blur identity") produced a `theoryAddressal` entry with the warning copied verbatim and a
+  concrete resolution — and the compiled `fields.style` **genuinely reflected** that exact
+  resolution (condensed the 4 genres into one described blend), in 45.5s. This is the concrete,
+  end-to-end proof that composition theory is now actually reflected in the compiled output, not
+  just passed through as unused context.
+- Mock-forced run (real dev server temporarily stopped, restarted with blanked Gemini env vars)
+  confirmed the Mock backend also satisfies the same validator deterministically.
+- 3-way concurrent Safe/Balanced/Bold compiles remain slower and occasionally fall back to Mock in
+  development under load — a disclosed, pre-existing concurrency/latency limitation
+  (`resilience.ts`'s own comment already named this before today), not silently hidden. See
+  `docs/TROUBLESHOOTING.md`.
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:

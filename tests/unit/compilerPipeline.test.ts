@@ -4,6 +4,7 @@ import { MockPromptCompiler } from "@/llm/mock/mockPromptCompiler";
 import { MockPromptEvaluator } from "@/llm/mock/mockPromptEvaluator";
 import { compileAllStrategies, compilePromptPackage } from "@/compiler/pipeline";
 import { MusicAIPromptPackageSchema } from "@/domain/promptPackage/schema";
+import { runTheoryEngines } from "@/theory/runTheoryEngines";
 import { buildValidSpec } from "./fixtures/songDesignSpec.fixture";
 
 function makeDeps() {
@@ -94,11 +95,37 @@ describe("Mock compile pipeline (Stage A-H)", () => {
       model: "mock",
       apiMode: "mock",
       promptTemplateVersion: "n/a",
-      schemaVersion: "1",
+      schemaVersion: "2",
       latencyMs: expect.any(Number),
       repairCount: 0,
     });
     expect(repaired).toBe(false);
     expect(metadata.latencyMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("addresses every required (warning/blocking-severity) theory warning in the compiled package (ADR-045)", async () => {
+    // buildValidSpec() alone only trips info-severity warnings; add a 4th genre so
+    // SubtractionEngine genuinely raises a warning-severity issue ("mixing this many can blur
+    // identity") — a real, non-contrived case, not an artificially empty one.
+    const base = buildValidSpec();
+    const spec = {
+      ...base,
+      musicalIdentity: {
+        ...base.musicalIdentity,
+        genres: [...base.musicalIdentity.genres, { tag: "synthwave", weight: 20 }, { tag: "folk", weight: 10 }, { tag: "jazz", weight: 10 }],
+      },
+    };
+    const deps = makeDeps();
+
+    const { package: pkg } = await compilePromptPackage(spec, "generic", "balanced", deps);
+    const theorySummary = runTheoryEngines(spec);
+    const requiredWarnings = theorySummary.engineWarnings.filter((w) => w.severity === "warning" || w.severity === "blocking");
+
+    expect(requiredWarnings.length).toBeGreaterThan(0);
+
+    const addressedKeys = new Set(pkg.theoryAddressal.map((a) => `${a.engine}:${a.message}`));
+    for (const warning of requiredWarnings) {
+      expect(addressedKeys.has(`${warning.engine}:${warning.message}`)).toBe(true);
+    }
   });
 });

@@ -872,6 +872,18 @@ export function ProjectEditor({ project }: { project: Project }) {
                     {pkg.unsupportedIntents.map((i) => i.intent).join(", ")}
                   </p>
                 )}
+                {pkg.theoryAddressal.length > 0 && (
+                  <div>
+                    <strong>Theory addressed:</strong>
+                    <ul>
+                      {pkg.theoryAddressal.map((entry, i) => (
+                        <li key={i} style={{ fontSize: "0.85rem" }}>
+                          <em>{entry.engine}</em>: {entry.resolution}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <button onClick={() => copyToClipboard(strategy, pkg.copyBundle)}>
                   {copiedKey === strategy ? "Copied!" : "Copy"}
                 </button>

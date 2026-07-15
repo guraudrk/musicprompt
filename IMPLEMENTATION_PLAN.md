@@ -654,7 +654,26 @@ Each requires official capability verification and tests.
     vague input) and real Gemini (a vague Korean North Star produced specific, well-reasoned
     Ballad/slow-tempo/acoustic-instrumentation/sorrowful-vocal suggestions with per-field
     confidence) — the concrete proof of "개떡같이 입력해도 찰떡같이 나온다."
-18. **Next actual work**: the larger structure/emotionCurve/contrastPlan/hookPlan inference
+18. ~~Make composition-theory engine warnings genuinely load-bearing in compiled output.~~ Done —
+    ADR-045. User asked directly whether prompt generation is really theory-based; investigation
+    found the 7 composition-theory engines' warnings reached Gemini's payload but were never
+    required to be used, never validated, and the Mock compiler hardcoded them empty. Added
+    `theoryAddressal: TheoryAddressal[]` to `MusicAIPromptPackageSchema` (`SCHEMA_VERSION` "1"→"2"),
+    a self-reported/deterministically-checked link between a warning and how it was addressed,
+    mirroring the existing lyrics-technique traceability pattern exactly. `provider-compiler.
+    system.md` now requires one traceable entry per active warning; `validateTheoryAddressal.ts`
+    (new) makes an unaddressed one a genuine Stage E blocking failure (triggers the existing
+    repair pass); `mockOutputBuilders.ts` and `ProjectEditor.tsx`'s results section updated to
+    match. Live-testing against real Gemini found the initial "address every warning regardless of
+    severity" requirement made compiles measurably slower (single-strategy ~45-62s vs. the
+    historical ~17-25s, 3-way concurrent Safe/Balanced/Bold calls sometimes exceeding even a raised
+    90s timeout and falling back to Mock in dev) — presented the numbers to the user, who chose to
+    restrict the mandatory requirement to warning/blocking severity only (info stays optional).
+    156 unit tests (up from 149); live-verified via a single-strategy compile call (avoiding 3-way
+    concurrency noise) that a spec with nothing substantive produces an honest empty
+    `theoryAddressal`, and a spec with a real issue (4 genres, tripping SubtractionEngine) produces
+    a traceable entry whose resolution is genuinely reflected in the compiled `style` field.
+19. **Next actual work**: the larger structure/emotionCurve/contrastPlan/hookPlan inference
     follow-up to item 17 is now a real, well-scoped candidate; translating `/dashboard` and the
     `ProjectEditor` form (the deferred i18n scope from the language-switcher slice) is also a real,
     sizeable candidate; the rest of Phase 7 (Sound Seed Orb,
@@ -662,7 +681,10 @@ Each requires official capability verification and tests.
     candidates are Phase 6 (Revision Lab), the full 8/14-screen wizard (PRODUCT_SPEC §16),
     `contrastPlan`/`hookPlan`/`repetitionPlan` UI, the lock-field UI for
     `compositionTheory.*Notes` (deferred since Phase 4), or project-version history (the
-    alternative not chosen in the compile-history slice — data already exists, UI doesn't). A
-    budget-limit policy decision is still pending before Gemini usage caps can be implemented, and
-    real rate limiting is still needed before any anonymous path could ever be allowed to call
-    Gemini (see `DECISIONS.md`).
+    alternative not chosen in the compile-history slice — data already exists, UI doesn't). The
+    3-way-concurrent Safe/Balanced/Bold real-Gemini latency limitation (ADR-045,
+    docs/TROUBLESHOOTING.md) remains unresolved — a candidate follow-up is compiling the three
+    strategies sequentially or with staggered starts instead of `Promise.all`, trading total wall
+    time for fewer concurrent-timeout fallbacks. A budget-limit policy decision is still pending
+    before Gemini usage caps can be implemented, and real rate limiting is still needed before any
+    anonymous path could ever be allowed to call Gemini (see `DECISIONS.md`).

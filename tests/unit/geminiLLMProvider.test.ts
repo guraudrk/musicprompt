@@ -62,7 +62,7 @@ describe("GeminiLLMProvider", () => {
     expect(params.input).toBe(JSON.stringify({ a: 1 }));
     expect(params.response_format).toMatchObject({ type: "text", mime_type: "application/json" });
     expect(params.response_format.schema).toBeTypeOf("object");
-    expect(options).toEqual({ timeout: 60_000, maxRetries: 1 });
+    expect(options).toEqual({ timeout: 90_000, maxRetries: 1 });
   });
 
   it("throws when the SDK returns no output_text", async () => {

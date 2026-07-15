@@ -1,6 +1,7 @@
 import type { SongDesignSpec } from "@/domain/songDesignSpec/schema";
 import type { ProviderCapabilityProfile } from "@/domain/providerCapability/schema";
-import type { MusicAIPromptPackage, Strategy, UnsupportedIntent } from "@/domain/promptPackage/schema";
+import type { CompositionTheorySpec } from "@/domain/songDesignSpec/theory";
+import type { MusicAIPromptPackage, Strategy, TheoryAddressal, UnsupportedIntent } from "@/domain/promptPackage/schema";
 import type { PromptQualityReport, EvaluationIssue } from "@/domain/evaluation/schema";
 import type { ProviderCompilerInput, PromptEvaluationInput } from "@/compiler/types";
 
@@ -60,6 +61,26 @@ function buildGuidanceTags(spec: SongDesignSpec, strategyProfile: StrategyProfil
   return [...genreTags, strategyProfile.extraGuidanceTag];
 }
 
+/**
+ * Deterministic stand-in for Gemini's required per-warning `theoryAddressal` (see
+ * provider-compiler.system.md). Mock never applies real creative judgment, so it just acknowledges
+ * every *required* (warning/blocking severity — ADR-045) active warning honestly — this exists to
+ * keep Mock passing the same Stage E validateTheoryAddressal() check Gemini output must pass, not
+ * to demonstrate real revision. Info-severity warnings are left unaddressed here too, matching the
+ * validator's scope.
+ */
+function buildTheoryAddressal(theorySummary: CompositionTheorySpec): TheoryAddressal[] {
+  return theorySummary.engineWarnings
+    .filter((warning) => warning.severity === "warning" || warning.severity === "blocking")
+    .map((warning) => ({
+      engine: warning.engine,
+      message: warning.message,
+      resolution: warning.suggestion
+        ? `Mock: applied deterministic placeholder — ${warning.suggestion}`
+        : "Mock: acknowledged; sign up for a Gemini-backed compile for a real revision.",
+    }));
+}
+
 function placeholderQuality(strategy: Strategy): PromptQualityReport {
   const neutral = 50;
   return {
@@ -84,7 +105,7 @@ function placeholderQuality(strategy: Strategy): PromptQualityReport {
 
 /** Stage D (Mock): deterministically builds a MusicAIPromptPackage from structured spec input. */
 export function buildCompilePayload(input: ProviderCompilerInput): MusicAIPromptPackage {
-  const { spec, provider, strategy } = input;
+  const { spec, provider, strategy, theorySummary } = input;
   const strategyProfile = STRATEGY_PROFILES[strategy];
 
   const lyricsBody = [spec.lyricsDesign.originalLyrics, ...spec.lyricsDesign.lockedLines]
@@ -129,9 +150,10 @@ export function buildCompilePayload(input: ProviderCompilerInput): MusicAIPrompt
       lyrics: spec.lyricsDesign.mode,
     },
     unsupportedIntents: collectUnsupportedIntents(spec, provider),
-    warnings: [],
+    warnings: theorySummary.engineWarnings.map((w) => w.message),
     toolInstructions: [`Paste the fields above into ${provider.displayName}.`],
     revisionLevers: [],
+    theoryAddressal: buildTheoryAddressal(theorySummary),
     promptQuality: placeholderQuality(strategy),
     copyBundle: `Title: ${title ?? "Untitled"}\n\nStyle: ${style}\n\nLyrics:\n${lyricsBody}\n\nExclude: ${negativePrompt ?? "none"}`,
   };

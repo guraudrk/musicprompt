@@ -1,9 +1,11 @@
 import type { SongDesignSpec } from "@/domain/songDesignSpec/schema";
 import type { ProviderCapabilityProfile } from "@/domain/providerCapability/schema";
+import type { CompositionTheorySpec } from "@/domain/songDesignSpec/theory";
 import type { ProviderRegistry } from "@/providers/registry";
 import type { PromptCompiler, PromptEvaluator, ProviderCompilerInput, CompilerMetadata } from "./types";
 import { MusicAIPromptPackageSchema, SCHEMA_VERSION, type MusicAIPromptPackage, type Strategy } from "@/domain/promptPackage/schema";
 import { runTheoryEngines } from "@/theory/runTheoryEngines";
+import { validateTheoryAddressal } from "./validateTheoryAddressal";
 
 export type CompilePipelineDeps = {
   registry: ProviderRegistry;
@@ -20,6 +22,7 @@ export type CompilePipelineResult = {
 function validatePackage(
   spec: SongDesignSpec,
   provider: ProviderCapabilityProfile,
+  theorySummary: CompositionTheorySpec,
   pkg: MusicAIPromptPackage,
 ): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
@@ -44,6 +47,11 @@ function validatePackage(
     if (value === undefined || value === null || value === "") {
       errors.push(`Required field "${requiredField}" for provider "${provider.providerId}" is missing.`);
     }
+  }
+
+  // Stage E: every active theory-engine warning must be genuinely addressed, not silently ignored.
+  if (parsed.success) {
+    errors.push(...validateTheoryAddressal(theorySummary, pkg));
   }
 
   return { ok: errors.length === 0, errors };
@@ -85,7 +93,7 @@ export async function compilePromptPackage(
   let pkg = await deps.compiler.compile(compilerInput);
 
   // Stage E: deterministic validation.
-  let validation = validatePackage(spec, provider, pkg);
+  let validation = validatePackage(spec, provider, theorySummary, pkg);
   let repaired = false;
 
   if (!validation.ok) {
@@ -97,7 +105,7 @@ export async function compilePromptPackage(
     });
     repaired = true;
 
-    validation = validatePackage(spec, provider, pkg);
+    validation = validatePackage(spec, provider, theorySummary, pkg);
     if (!validation.ok) {
       throw new Error(
         `Prompt package still fails validation after the single repair pass: ${validation.errors.join("; ")}`,

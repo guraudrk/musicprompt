@@ -1208,3 +1208,98 @@ See `DECISIONS.md` ADR-044 (spec interpretation feature, scope, and the disclose
   scope for this slice, a real candidate for the next one.
 - Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first-sixth slices is still
   pending.
+
+---
+
+## Composition theory made load-bearing in compiled output (2026-07-15, ADR-045)
+
+### 한글 요약
+
+- **왜 만들었나**: 사용자가 "우리가 가진 이론들 기반으로 프롬포트 생성하는 거 맞아?"라고 직접
+  물었습니다. 조사해보니 가사 기법(작사 노하우)은 실제로 반영되고 검증되고 있었지만, 7개 작곡
+  이론 엔진의 경고는 Gemini에게 데이터로는 전달되면서도 "반영하라"는 지시가 없었고, 실제로
+  반영됐는지 검증하는 코드도 없었으며, Mock 컴파일러는 아예 항상 빈 배열(`warnings: []`)을
+  반환하고 있었습니다. 사용자가 "이론이 결과물에 온전히 반영되어야 프로젝트가 의미 있다"고
+  확인해줘서 진행했습니다.
+- **무엇을 만들었나**: 가사 기법 추적 방식(`techniquesUsed`를 실제 선택 기법과 대조 검증하는
+  방식)과 완전히 동일한 패턴으로, `theoryAddressal`이라는 새 필드를 컴파일 결과물 스키마에
+  추가했습니다. 각 이론 엔진 경고마다 "어떻게 반영했는지"를 정확히 적어야 하고, 경고 문구를
+  그대로 복사해야(검증 가능하도록) 하며, 반영 안 된 경고가 있으면 컴파일이 실패 처리되어 기존
+  재시도(repair) 로직이 작동하도록 만들었습니다. 프로젝트 편집기 결과 화면에도 "Theory addressed"
+  목록을 새로 추가해서, 사용자가 직접 눈으로 확인할 수 있게 했습니다.
+- **라이브 검증 중 발견한 진짜 문제**: 처음에는 심각도 상관없이 모든 경고를 다 반영하도록
+  강제했는데, 실제 Gemini로 검증해보니 컴파일 시간이 기존 17~25초에서 최대 2.5분까지 늘어났고,
+  3개 전략(Safe/Balanced/Bold)을 동시에 요청하면 일부가 타임아웃으로 Mock에 자동 폴백되기도
+  했습니다. 이 구체적인 수치를 사용자에게 그대로 보여주고 선택을 받았고, "warning/blocking
+  심각도만 강제 반영, info 수준의 사소한 제안은 선택사항으로" 범위를 줄이기로 결정했습니다.
+- **최종 검증**: 3개 전략을 동시에 부르면 지연 시간이 뒤섞여서 신호가 지저분해지므로, 단일
+  전략만 직접 호출하는 방식으로 깨끗하게 검증했습니다. 특별히 반영할 문제가 없는 프로젝트는
+  정직하게 빈 목록을 반환했고(62초), 장르를 4개나 선언해 실제 경고(SubtractionEngine)가 발생하는
+  프로젝트에서는 Gemini가 그 경고 문구를 정확히 인용하고, "4개 장르를 하나의 통일된 스타일로
+  압축했다"는 구체적인 해결 내용을 적었으며, 실제로 컴파일된 `style` 필드에 그 내용이 그대로
+  반영되어 있는 걸 확인했습니다(45.5초). 이게 바로 "이론이 결과물에 실제로 반영된다"는 걸
+  증명하는 구체적인 증거입니다.
+- **부수적으로 다시 발견한 문제**: 라이브 검증 도중 오늘 이미 한 번 고쳤던 로컬 DB 비밀번호
+  어긋남 문제가 컨테이너 재시작 없이도 다시 재발했습니다(원인은 못 찾았지만 같은 방법으로 다시
+  고침).
+
+### What shipped
+
+- `src/domain/promptPackage/schema.ts` — `TheoryAddressalSchema`/`TheoryAddressal` (new),
+  `theoryAddressal: TheoryAddressal[]` added to `MusicAIPromptPackageSchema`, `SCHEMA_VERSION`
+  bumped `"1"` → `"2"`.
+- `src/llm/gemini/prompts/provider-compiler.system.md` — new required "Theory warnings" section:
+  one traceable entry per active `warning`/`blocking`-severity engine warning; `info`-severity ones
+  are optional.
+- `src/compiler/validateTheoryAddressal.ts` (new) — deterministic backstop mirroring
+  `src/lyrics/validateDraftSet.ts`'s shape; wired into `pipeline.ts`'s Stage E `validatePackage()`
+  (now threads `theorySummary` through), making an unaddressed required warning a genuine blocking
+  validation failure that triggers the existing single-repair-pass mechanism.
+- `src/llm/mock/mockOutputBuilders.ts` — `buildTheoryAddressal()` (new), populates the
+  previously-always-empty `warnings`/`revisionLevers`-adjacent fields from the real `theorySummary`.
+- `src/llm/gemini/resilience.ts` — `GEMINI_REQUEST_OPTIONS.timeout` raised 60s → 90s.
+- `ProjectEditor.tsx` — new "Theory addressed" block per compiled Safe/Balanced/Bold result.
+- `docs/PRODUCT_SPEC.md` — `MusicAIPromptPackage` TS-shape block, Stage D/E lists updated to match.
+- `tests/unit/validateTheoryAddressal.test.ts` (new), `tests/unit/compilerPipeline.test.ts`
+  (updated: `schemaVersion` "1"→"2", new end-to-end addressal-coverage test),
+  `tests/unit/geminiLLMProvider.test.ts` (updated timeout assertion). 156 unit tests (up from 149).
+
+### Live verification
+
+- **Mock-forced** (real dev server temporarily stopped, restarted with blanked Gemini env vars):
+  confirmed the "Theory addressed" UI block renders one deterministic entry per active
+  warning/blocking-severity warning for a fresh project.
+- **Real Gemini, single-strategy calls** (`POST /api/projects/{id}/compile/generic`, avoiding the
+  3-way-concurrency noise of `/compile/compare`): a spec with nothing substantive to address
+  correctly produced an empty `theoryAddressal` in 62s (no fabricated busywork); a spec with 4
+  declared genres (a real `SubtractionEngine` warning) produced a correctly-traced entry whose
+  resolution was genuinely reflected in the compiled `style` field, in 45.5s.
+- **Real Gemini, 3-way concurrent Safe/Balanced/Bold**: confirmed slower and occasionally
+  fell back to Mock in development under load — a disclosed, pre-existing concurrency limitation
+  made more visible by this feature's added latency, not a new bug introduced by it; not
+  fully resolved this slice (see Known gaps).
+- Also re-encountered and re-fixed the same Postgres local-auth drift from earlier today (see
+  `docs/TROUBLESHOOTING.md`) — recurred once without a container restart; root cause of the
+  recurrence itself wasn't pinned down, but the fix worked identically both times with zero data
+  loss.
+
+### Verification at time of this entry
+
+- `pnpm typecheck`, `pnpm lint`, `pnpm build` — pass
+- `pnpm test` — 156/156 pass (up from 149)
+- Live walkthrough (Mock-forced + real-Gemini single-strategy + real-Gemini 3-way-concurrent) —
+  pass, with the 3-way-concurrency latency limitation honestly disclosed rather than hidden
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-045 (theoryAddressal feature, the severity-scoping decision made with the
+user after live-testing revealed the latency cost, and the disclosed 3-way-concurrency limitation).
+
+### Known gaps carried forward
+
+- 3-way-concurrent Safe/Balanced/Bold real-Gemini latency/timeout risk — not resolved this slice;
+  a candidate follow-up is compiling strategies sequentially/staggered instead of `Promise.all`.
+- Structure/emotionCurve/contrastPlan/hookPlan/compositionTheory inference (spec-interpreter
+  follow-up) — still pending from the previous slice.
+- Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first-sixth slices is still
+  pending.

@@ -612,3 +612,53 @@ destructive one. General lesson: if `docker exec` auth works but external TCP au
 "correct" password fails, suspect a stale password baked into an old volume before suspecting the
 config files — they can look correct and still not match the live database.
 
+**Recurred later the same session** (see the theoryAddressal entry below): the same
+`docker exec ... psql` auth-works / external-TCP-auth-fails pattern reappeared on the same running
+container after having already been fixed once, despite the container never restarting (`docker ps`
+showed continuous uptime) and the data remaining intact (`User` row count kept growing across
+sessions, confirming no volume reset happened). Root cause of the *recurrence* itself was not
+pinned down — re-applying the same `ALTER USER postgres WITH PASSWORD 'postgres';` fix worked again
+immediately. If this keeps recurring, it may be worth checking for a competing process or script
+that resets the role password, rather than continuing to patch it reactively each time.
+
+---
+
+## theoryAddressal feature (ADR-045) — real Gemini compiles got measurably slower
+
+### Requiring a full theory-addressal list on every compile pushed real Gemini past the request timeout
+
+**Symptom:** Live-verifying that composition-theory warnings are actually reflected in compiled
+output (ADR-045), the first implementation (require an addressal entry for every active warning,
+any severity) made real Safe/Balanced/Bold compiles take up to 2.5 minutes, with some of the three
+concurrent strategy calls timing out and silently falling back to Mock in development (masked by
+the existing dev-only fallback — see `wrapCompilerWithDevFallback` in `src/llm/devFallback.ts` —
+so a `200 OK` response did not necessarily mean real Gemini actually succeeded).
+
+**Cause:** Two compounding factors. (1) The added system-prompt section and the larger required
+output schema measurably increased real per-call latency: a single-strategy compile that
+historically took ~17-25s (Phase 3, ADR-003) now took ~45-62s even for a spec with *nothing*
+substantive to address. (2) The three Safe/Balanced/Bold calls already shared rate-limit/throughput
+headroom under concurrent load (a limitation the project's own `resilience.ts` comment already
+named before this feature) — with each call now individually slower, more of the three concurrent
+calls crossed even a raised 90s timeout.
+
+**Fix:** Presented the concrete numbers to the user and got a decision: restrict the *mandatory*
+addressal requirement to `"warning"`/`"blocking"`-severity engine warnings only (the more numerous
+`"info"`-severity ones — minor stylistic notes — remain visible in the existing Analyze UI but are
+optional per-compile). Also raised `GEMINI_REQUEST_OPTIONS.timeout` 60s → 90s as a modest buffer.
+This did not eliminate the underlying 3-way-concurrency latency limitation, but reduced the
+generation burden per call and kept the enforcement genuinely meaningful for substantive findings.
+
+**How the fix was actually verified (not just reasoned about):** rather than continuing to fight
+3-way-concurrent real-Gemini timing (expensive and noisy — three consecutive full attempts all
+landed at ~2.5 minutes), switched to calling the single-strategy endpoint
+(`POST /api/projects/{id}/compile/generic`, `{strategy: "safe"}`) directly via
+`page.request.post(...)` with the browser's authenticated session — this avoids 3-way concurrency
+entirely and gives a clean, isolated signal. Confirmed: a spec with nothing substantive produced an
+empty `theoryAddressal` in 62s (no fabricated busywork); a spec with 4 declared genres (a genuine
+`SubtractionEngine` warning) produced a correctly-traced addressal entry whose `resolution` was
+*actually reflected* in the compiled `fields.style` text, in 45.5s. General lesson: when verifying
+a feature that's entangled with a known 3-way-concurrency latency issue, isolate to a single call
+first — it's cheaper, faster, and separates "does the feature work" from "does the existing
+concurrency limitation still exist" instead of conflating both into one noisy signal.
+
