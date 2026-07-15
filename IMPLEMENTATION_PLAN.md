@@ -623,7 +623,20 @@ Each requires official capability verification and tests.
     (`src/i18n/dictionaries/types.ts`) makes a missing translation key a compile error. 129 unit
     tests (up from 127, new dictionary key-parity test); live-verified all 3 languages at desktop
     and mobile widths via screenshots, plus persistence across a reload.
-16. **Next actual work**: translating `/dashboard` and the `ProjectEditor` form (the deferred i18n
+16. ~~Fix no-login demo output quality (genre/tempo/vocal extraction) + remove named-person
+    reference from Craft copy.~~ Done — ADR-042/ADR-043. A user reported the demo always producing
+    "unspecified genre at unspecified ... unspecified instrumentation" and a lyrics field that just
+    echoed their input verbatim, and asked whether this was because Gemini needs login — it was not;
+    two real bugs in `src/app/api/demo/compile/route.ts` (never populating
+    `musicalIdentity.genres`/`tempoDescription`/`instrumentation` from the free-text idea, and
+    conflating the idea description with actual lyric text). Fixed with a new, deterministic,
+    non-AI keyword extractor (`extractHints.ts`, EN/KO/JA) and an honest "sign up for real lyrics"
+    fallback message. Also removed the Kim Eana/김이나/キム・イナ named-person reference from Craft
+    card 4 across all three locales per explicit user request, replacing it with generic
+    professional-practice phrasing. 137 unit tests (up from 129); live-verified against the running
+    dev server with the user's exact reported input, which also caught and fixed a substring-
+    collision bug (`"kpop"` double-matching the generic `"pop"` keyword).
+17. **Next actual work**: translating `/dashboard` and the `ProjectEditor` form (the deferred i18n
     scope from this slice) is now a real, sizeable candidate; the rest of Phase 7 (Sound Seed Orb,
     provider selector, Lab preview, app section, Lighthouse baseline) remains open; other
     candidates are Phase 6 (Revision Lab), the full 8/14-screen wizard (PRODUCT_SPEC §16),

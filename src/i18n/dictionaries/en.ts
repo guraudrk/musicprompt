@@ -51,7 +51,7 @@ export const en: Dictionary = {
       "A favorite line, a fixed hook, a title you won't change — mark it locked and it survives every draft, every compile, every revision, character for character.",
     card4Title: "We studied the syllabus, not just vibes 🎓",
     card4Body:
-      "The 7 theory engines above directly implement principles taught in Berklee, USC Thornton, NYU Steinhardt, and Juilliard songwriting curricula. The lyric technique menu is grounded in real K-pop lyricist practice — multi-draft comparison, demo-fitting, the working method associated with lyricists like Kim Eana. Not invented from scratch, and not claiming to guarantee a hit — just checked automatically instead of left to guesswork.",
+      "The 7 theory engines above directly implement principles taught in Berklee, USC Thornton, NYU Steinhardt, and Juilliard songwriting curricula. The lyric technique menu is grounded in real K-pop lyricist practice — multi-draft comparison, demo-fitting, the iterative workflow used by professional lyric-writing teams. Not invented from scratch, and not claiming to guarantee a hit — just checked automatically instead of left to guesswork.",
   },
   demoForm: {
     label: "Describe your musical idea — no signup needed",
@@ -61,6 +61,7 @@ export const en: Dictionary = {
     genericError: "Generation failed.",
     style: "Style:",
     lyrics: "Lyrics:",
+    noLyricsFallback: "Sign up to generate real lyric drafts with Gemini — the free demo only compiles style direction.",
     signUpLink: "Sign up",
     upsellSuffix: "to save this project and unlock Safe / Balanced / Bold with real Gemini output.",
   },

@@ -68,7 +68,7 @@ export function DemoForm() {
             <strong>{dict.demoForm.style}</strong> {result.fields.style}
           </p>
           <p>
-            <strong>{dict.demoForm.lyrics}</strong> {result.fields.lyrics}
+            <strong>{dict.demoForm.lyrics}</strong> {result.fields.lyrics ?? dict.demoForm.noLyricsFallback}
           </p>
           <p className={styles.demoUpsell}>
             <Link href="/signup">{dict.demoForm.signUpLink}</Link> {dict.demoForm.upsellSuffix}

@@ -54,6 +54,7 @@ export interface Dictionary {
     genericError: string;
     style: string;
     lyrics: string;
+    noLyricsFallback: string;
     signUpLink: string;
     upsellSuffix: string;
   };

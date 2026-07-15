@@ -1025,6 +1025,83 @@ with URL-based routing if either becomes a real requirement.
 
 ---
 
+## ADR-042 — No-login demo: map free-text idea into structured genre/tempo/vocal hints; stop echoing the idea as "lyrics"
+
+- Status: Accepted
+- Date: 2026-07-15
+
+### Decision
+
+A user reported the anonymous demo producing a genuinely low-quality result — Style always read
+"unspecified genre at unspecified ... unspecified instrumentation" regardless of what was typed,
+and the Lyrics field was just a verbatim echo of the input. User asked whether this was simply
+because Gemini is unavailable without login. **It was not** — root-caused to two real bugs in
+`src/app/api/demo/compile/route.ts`, independent of the (correct, unrelated) Mock-only-by-design
+safety guarantee:
+
+1. The demo only ever set `spec.northStar.audienceExperience`. `MockPromptCompiler`'s
+   `buildStyleText()` (`src/llm/mock/mockOutputBuilders.ts`) reads
+   `musicalIdentity.genres`/`tempoDescription`/`instrumentation`, none of which the route
+   populated — so it always fell through to the `"unspecified ..."` defaults.
+2. An earlier fix had set `spec.lyricsDesign.originalLyrics = parsed.data.idea`, conflating "the
+   user's song-idea description" with "lyric text the user actually wrote." This made `fields.lyrics`
+   a verbatim echo, not a reflection of any real content.
+
+Fix: added `src/app/api/demo/compile/extractHints.ts` — plain, deterministic regex keyword-matching
+(explicitly **not** classification or AI, to preserve the Mock-only safety guarantee) over the idea
+text, covering English/Korean/Japanese keywords for genre (K-pop, J-pop, Hip-hop, R&B, Ballad, Rock,
+Jazz, Indie, Electronic, Folk, Pop), tempo (mid-tempo, up-tempo, fast, slow), and vocal gender
+(male/female vocal). The route now populates `musicalIdentity.genres`/`tempoDescription`/
+`instrumentation` from these hints when found, leaving the existing `"unspecified"` fallback intact
+for ideas with no matching keywords. The flawed `originalLyrics = idea` line was removed entirely;
+`fields.lyrics` is now legitimately `undefined` for a typical demo idea, and `DemoForm.tsx` renders
+an honest `dict.demoForm.noLyricsFallback` message ("sign up to generate real lyric drafts with
+Gemini") instead of a misleading echo.
+
+While live-verifying the fix, also found and fixed a real substring-collision bug in the genre
+matcher: `"kpop"` was additionally matching the generic `pop` keyword (since `pop` is a literal
+substring of `kpop`), producing a redundant `"K-pop/Pop"` tag pair. Fixed with a lookbehind
+excluding `pop`/`팝`/`ポップ` matches immediately preceded by `k`/`j`/`-`/`케이`/`ケイ`.
+
+### Reason
+
+The user's question ("is this just because Gemini needs login?") deserved a real, verified answer,
+not a reassuring assumption — this is a genuine, fixable quality bug in the demo's input-mapping
+logic, unrelated to the deliberate Gemini-gating. Keyword matching (not AI/classification) was
+chosen specifically to keep the anonymous demo's Mock-only-by-construction safety guarantee intact
+— see the route's own header comment and ADR referenced there.
+
+### Tests
+
+`tests/unit/extractHints.test.ts` (new) and updated `tests/unit/apiDemoCompileRoute.test.ts` cover:
+EN/KO/JA keyword extraction, de-duplication, the no-keyword "unspecified" fallback, the exact
+reported input producing `"K-pop/Ballad/Rock at mid-tempo ... Instrumentation: male vocal."`, and
+`fields.lyrics` being `undefined` (not an echo) for a plain idea description.
+
+---
+
+## ADR-043 — Craft card 4 copy: cite professional practice generically, not a named real person
+
+- Status: Accepted
+- Date: 2026-07-15
+
+### Decision
+
+ADR-040's 4th Craft card copy named lyricist Kim Eana as an example of the K-pop lyric-team working
+method the lyric technique menu is grounded in. Per explicit user request, removed the named-person
+reference from all three locales (`en`/`ko`/`ja`) and replaced it with a generic description of the
+same underlying practice ("the iterative workflow used by professional lyric-writing teams" /
+"전문 작사팀들이 실제로 쓰는 반복적 작업 방식" / "プロの作詞チームが実際に使う反復的な作業手法").
+
+### Reason
+
+User's stated rationale: generic/common-noun phrasing reads as more authoritative for this claim
+than naming a specific real individual. The underlying factual grounding (verified against
+`docs/METHODOLOGY.md` in ADR-040) is unchanged — only the specific-name citation was removed from
+user-facing copy.
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:

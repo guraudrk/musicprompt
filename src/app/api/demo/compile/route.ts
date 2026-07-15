@@ -5,6 +5,7 @@ import { InMemoryProviderRegistry } from "@/providers/registry";
 import { MockPromptCompiler } from "@/llm/mock/mockPromptCompiler";
 import { MockPromptEvaluator } from "@/llm/mock/mockPromptEvaluator";
 import { buildDefaultSpec } from "@/domain/songDesignSpec/defaultSpec";
+import { extractHints } from "./extractHints";
 
 /**
  * Anonymous, no-login demo of the compile pipeline for the landing page. Deliberately isolated
@@ -32,11 +33,17 @@ export async function POST(request: Request) {
 
   const spec = buildDefaultSpec(crypto.randomUUID());
   spec.northStar.audienceExperience = parsed.data.idea;
-  // `MockPromptCompiler`'s `fields.lyrics` derives only from `lyricsDesign.originalLyrics` /
-  // `lockedLines` (src/llm/mock/mockOutputBuilders.ts), not from northStar — without this the
-  // demo result would show an empty "Lyrics" field even though direct/simple lyrics are a
-  // complete option (CLAUDE.md §3), not something to leave blank.
-  spec.lyricsDesign.originalLyrics = parsed.data.idea;
+
+  const hints = extractHints(parsed.data.idea);
+  if (hints.genres.length > 0) {
+    spec.musicalIdentity.genres = hints.genres.map((tag) => ({ tag, weight: 50 }));
+  }
+  if (hints.tempo) {
+    spec.musicalIdentity.tempoDescription = hints.tempo;
+  }
+  if (hints.vocal) {
+    spec.musicalIdentity.instrumentation = [hints.vocal];
+  }
 
   try {
     const result = await compilePromptPackage(spec, "generic", "balanced", demoDeps);

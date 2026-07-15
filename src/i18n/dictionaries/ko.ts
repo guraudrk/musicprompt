@@ -51,7 +51,7 @@ export const ko: Dictionary = {
       "마음에 드는 한 줄, 고정된 훅, 바꾸지 않을 제목 — 잠그기만 하면 모든 초안·컴파일·수정에서 글자 하나까지 그대로 보존됩니다.",
     card4Title: "감으로만 만들지 않았습니다, 커리큘럼부터 공부했습니다 🎓",
     card4Body:
-      "위의 7개 이론 엔진은 Berklee, USC Thornton, NYU Steinhardt, Juilliard 작곡 커리큘럼에서 가르치는 원리를 직접 구현한 것입니다. 가사 기법 메뉴는 실제 K-pop 작사 실무 — 복수 초안 비교, 데모 피팅, 김이나 같은 작사가들과 연관된 작업 방식 — 에 근거합니다. 그냥 지어낸 게 아니고, 그렇다고 히트를 보장한다는 것도 아닙니다 — 그저 감으로 남겨두지 않고 자동으로 검사할 뿐입니다.",
+      "위의 7개 이론 엔진은 Berklee, USC Thornton, NYU Steinhardt, Juilliard 작곡 커리큘럼에서 가르치는 원리를 직접 구현한 것입니다. 가사 기법 메뉴는 실제 K-pop 작사 실무 — 복수 초안 비교, 데모 피팅, 전문 작사팀들이 실제로 쓰는 반복적 작업 방식 — 에 근거합니다. 그냥 지어낸 게 아니고, 그렇다고 히트를 보장한다는 것도 아닙니다 — 그저 감으로 남겨두지 않고 자동으로 검사할 뿐입니다.",
   },
   demoForm: {
     label: "음악 아이디어를 적어보세요 — 회원가입 필요 없음",
@@ -61,6 +61,7 @@ export const ko: Dictionary = {
     genericError: "생성에 실패했습니다.",
     style: "스타일:",
     lyrics: "가사:",
+    noLyricsFallback: "실제 가사 초안은 회원가입 후 Gemini로 생성됩니다 — 무료 데모는 스타일 방향만 컴파일합니다.",
     signUpLink: "회원가입",
     upsellSuffix: "하면 이 프로젝트를 저장하고 실제 Gemini 출력으로 Safe / Balanced / Bold를 사용할 수 있습니다.",
   },

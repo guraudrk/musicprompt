@@ -543,3 +543,39 @@ it, not just the component that calls it — check `pnpm build`'s route table be
 either, since the regression is easy to miss (no error, no test failure, just a quieter
 route-table symbol).
 
+---
+
+## Phase 7 (bug fix — no-login demo output quality)
+
+### Demo Style field always showed "unspecified genre at unspecified ... unspecified instrumentation"
+
+**Symptom:** A user reported that typing a specific idea ("기차역에서의 씁쓸한 이별 노래, kpop
+락발라드 형식, 미드 템포, 남자 가수" — a bittersweet train-station farewell, K-pop rock-ballad,
+mid-tempo, male vocal) into the anonymous demo always produced a Style field reading "unspecified
+genre at unspecified, ... Instrumentation: unspecified instrumentation," and a Lyrics field that
+was just their input echoed back verbatim. They asked whether this was simply because Gemini is
+unavailable without login.
+
+**Cause:** It was not a Gemini-availability issue. Two real bugs in
+`src/app/api/demo/compile/route.ts`: (1) the route only ever set
+`spec.northStar.audienceExperience`, never `musicalIdentity.genres`/`tempoDescription`/
+`instrumentation` — the exact fields `MockPromptCompiler`'s `buildStyleText()` reads — so it always
+fell through to their `"unspecified"` defaults; (2) an earlier fix had set
+`spec.lyricsDesign.originalLyrics = parsed.data.idea`, conflating "the user's song-idea
+description" with "lyric text the user actually wrote," producing a verbatim-echo `fields.lyrics`
+instead of anything resembling generated content.
+
+**Fix:** Added `src/app/api/demo/compile/extractHints.ts`, deterministic EN/KO/JA regex keyword
+matching (genre, tempo, vocal gender) — explicitly not classification/AI, to preserve the demo's
+Mock-only safety guarantee. The route now populates the structured spec fields from these hints
+when found, and no longer echoes the idea into `lyricsDesign.originalLyrics`; `DemoForm.tsx` shows
+an honest "sign up to generate real lyrics" message when `fields.lyrics` is unset. See
+`DECISIONS.md` ADR-042.
+
+**Bonus bug found during live-verification:** the fix's own genre matcher initially produced a
+redundant `"K-pop/Pop"` tag pair, because the generic `pop` keyword regex matched as a substring
+inside `"kpop"`. Fixed with a lookbehind excluding `pop` matches immediately preceded by `k`/`j`/`-`.
+General lesson: after writing a regex-based extractor, feed it the exact reported input and read
+the raw output — substring-collision false positives between a specific keyword (`kpop`) and a
+more general one (`pop`) don't show up in isolated unit tests unless you test them together.
+

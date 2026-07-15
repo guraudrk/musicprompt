@@ -1041,3 +1041,77 @@ trade-off).
   ADR-041's trade-off).
 - Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first-fifth slices is still
   pending.
+
+---
+
+## Phase 7 (bug fix, 2026-07-15) — No-login demo output quality (genre/tempo/vocal extraction) + Craft copy edit
+
+### 한글 요약
+
+- **무엇이 문제였나**: 사용자가 로그인 없이 데모에 "기차역에서의 씁쓸한 이별 노래, kpop 락발라드
+  형식, 미드 템포, 남자 가수"라고 구체적으로 입력했는데도, 스타일 결과가 항상 "unspecified genre at
+  unspecified ... unspecified instrumentation"로 나오고, 가사 칸에는 입력한 글자가 그대로 복사되어
+  나왔습니다. 사용자는 이게 로그인을 안 해서 제미나이를 못 써서 그런 건지 물어봤습니다.
+- **원인 확인**: 로그인 여부와 무관한 진짜 버그였습니다. (1) 데모 API가 사용자의 아이디어 텍스트를
+  `northStar.audienceExperience`에만 넣고, 정작 스타일 문구를 만드는 `musicalIdentity.genres` /
+  `tempoDescription` / `instrumentation` 필드는 전혀 채우지 않아서 항상 기본값("unspecified")이
+  나왔습니다. (2) 예전 수정에서 사용자의 "아이디어 설명"을 "실제로 쓴 가사"로 착각해서
+  `lyricsDesign.originalLyrics`에 그대로 넣어버려, 가사 칸이 그냥 입력값을 그대로 복사한 것처럼
+  보였습니다.
+- **수정 내용**: `extractHints.ts`라는 새 파일을 만들어, 입력 문장에서 장르(K-pop, 힙합, 발라드,
+  락 등) · 템포(미드템포, 업템포 등) · 보컬 성별(남자/여자 가수) 키워드를 한국어·영어·일본어로
+  찾아내는 단순한 정규식 매칭 함수를 작성했습니다 (AI나 분류 모델이 아니라 순수 키워드 매칭이라는
+  점이 중요합니다 — 이래야 데모가 절대 실제 제미나이를 호출하지 않는다는 안전장치가 그대로
+  유지됩니다). 데모 API가 이 힌트를 스타일 필드에 반영하도록 고쳤고, 가사 칸에 입력값을 그대로
+  복사해 넣던 코드는 완전히 제거했습니다. 이제 가사 칸이 비어있을 땐 "회원가입하면 제미나이로 실제
+  가사를 만들 수 있다"는 정직한 안내 문구가 표시됩니다.
+- **실제 테스트로 발견한 보너스 버그**: 실제 서버에 사용자가 입력한 그대로의 문장을 넣어 확인하다가,
+  "kpop"이라는 단어 안에 "pop"이라는 글자가 포함되어 있어서 장르가 "K-pop/Pop"처럼 중복으로 나오는
+  걸 발견했습니다. k, j, 하이픈, "케이" 바로 뒤에 오는 "pop"은 제외하도록 정규식을 고쳐서 해결했습니다.
+- **추가 요청 — 김이나 이름 삭제**: 어제(2026-07-15) 추가했던 Craft 카드에서 실제 인물(작사가
+  김이나)의 이름을 직접 언급했었는데, 사용자가 "실제 사람 이름보다 보통명사가 더 권위 있어 보인다"는
+  이유로 이름을 빼고 일반적인 표현("전문 작사팀들이 실제로 쓰는 반복적 작업 방식")으로 바꿔달라고
+  요청해서 한국어·영어·일본어 세 버전 모두 수정했습니다.
+
+### What shipped
+
+- `src/app/api/demo/compile/extractHints.ts` (new) — deterministic, non-AI regex keyword matching
+  for genre/tempo/vocal-gender across EN/KO/JA.
+- `src/app/api/demo/compile/route.ts` — populates `musicalIdentity.genres`/`tempoDescription`/
+  `instrumentation` from extracted hints (only when found, preserving the existing "unspecified"
+  fallback); removed the `lyricsDesign.originalLyrics = idea` line that caused the verbatim-echo
+  "lyrics" bug.
+- `src/app/DemoForm.tsx` + `src/i18n/dictionaries/{types,en,ko,ja}.ts` — new
+  `demoForm.noLyricsFallback` key shown instead of a blank/echoed lyrics field.
+- `src/i18n/dictionaries/{en,ko,ja}.ts` — Craft card 4 copy edited to remove the named-person
+  (Kim Eana / 김이나 / キム・イナ) reference, replaced with generic professional-practice phrasing
+  in all three locales.
+- `tests/unit/extractHints.test.ts` (new) and `tests/unit/apiDemoCompileRoute.test.ts` (updated) —
+  cover EN/KO/JA extraction, de-duplication, the no-keyword fallback, the exact reported input, and
+  `fields.lyrics` being `undefined` (not an echo).
+
+### Live verification
+
+- Hit the real running dev server's `/api/demo/compile` with the user's exact reported Korean
+  input via a Node `fetch` script (curl via the shell mangled the UTF-8 bytes — a terminal/shell
+  encoding artifact, not a product bug, confirmed by comparing against the Node-fetch result).
+- Before fix: `"unspecified genre at unspecified, ... unspecified instrumentation"`, lyrics = raw
+  echoed input.
+- After fix: `"K-pop/Ballad/Rock at mid-tempo, ... Instrumentation: male vocal."`, lyrics =
+  `undefined` (renders the honest sign-up prompt instead).
+
+### Verification at time of this entry
+
+- `pnpm typecheck`, `pnpm lint`, `pnpm build` — pass
+- `pnpm test` — 137/137 pass (up from 129)
+- Live walkthrough against the running dev server with the user's exact reported input — pass
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-042 (demo hint-extraction fix) and ADR-043 (Craft card 4 named-person
+removal).
+
+### Known gaps carried forward
+
+- Everything already pending from Phase 0-5 + Phase 2-tail + Phase 7 first-sixth slices is still
+  pending.
