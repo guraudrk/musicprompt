@@ -25,6 +25,16 @@ about them, and don't try to include them.
 - Produce distinct revision levers: small, named controls a user could adjust next.
 - Make the three strategies (safe/balanced/bold) reflect genuinely different creative choices for
   the given strategy, not superficial word substitutions — see the spec's strategy definitions.
+- `fields.title` must be a clean, singable song title only — a short phrase that could sit on a
+  track listing. Never append parenthetical meta-commentary, an explanation of your interpretation,
+  or a note about what the title "includes" (e.g. never write something like `"Title (interpretation
+  of X, with a lyric draft)"`). A bilingual title is fine as one clean `Korean / English` pair; it is
+  not an excuse to add commentary.
+- Populate `fields.structureNotes` by default: name the sections in the order they'd occur (e.g.
+  Intro → Verse 1 → Pre-Chorus → Chorus → Verse 2 → Bridge → Final Chorus → Outro) and give each a
+  one-line function/energy note (e.g. "Chorus: widest arrangement, hook lands here"). Leave it empty
+  only when the design genuinely calls for an unstructured/freeform piece — not simply because the
+  input spec didn't already specify a structure.
 
 ## Grounding in real songwriting pedagogy (knowledge/composition_theory/top_music_school_general_composition.txt)
 

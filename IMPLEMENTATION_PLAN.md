@@ -760,7 +760,14 @@ Each requires official capability verification and tests.
     at least some of the chased unreliability may be genuine, time-varying Gemini capacity
     pressure rather than something client-side fixable. The call still fell back to Mock, so this
     change's live quality effect remains unverified; further live retries paused per user decision.
-26. **Next actual work**: replacing the in-memory demo rate limiter with a shared store (Vercel
+26. ~~Clean up `fields.title` and encourage `fields.structureNotes` in the compiler prompt.~~
+    Done — ADR-053. First clean (non-Mock) real Gemini response obtained since ADR-052 showed real
+    theory application in `fields.prompt` but a cluttered `title` field (meta-commentary in
+    parentheses) and an omitted `structureNotes` field. Added explicit prompt guidance for both;
+    typecheck/lint/test (173/173) pass (prompt-only change). Two live retests immediately after
+    both hit the 90s timeout/Mock fallback again, so this fix's live effect is not yet confirmed —
+    deferred to next session per the standing memory note once Gemini responds more reliably.
+27. **Next actual work**: replacing the in-memory demo rate limiter with a shared store (Vercel
     KV/Upstash Redis) before actual Vercel deployment is now a concrete, well-scoped pre-deployment
     task (ADR-046); the larger structure/emotionCurve/contrastPlan/hookPlan inference
     follow-up to item 17 is now a real, well-scoped candidate; translating `/dashboard` and the

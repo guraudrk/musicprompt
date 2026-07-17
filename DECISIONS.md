@@ -1738,6 +1738,59 @@ diminishing returns if the bottleneck is Google's current model-level capacity.
 
 ---
 
+## ADR-053 — Clean up `fields.title` and encourage `fields.structureNotes` in the compiler prompt
+
+- Status: Accepted, live effect unconfirmed
+- Date: 2026-07-17
+
+### Decision
+
+The first clean (non-Mock-fallback) real Gemini response obtained after ADR-050/051/052 — for a
+general idea ("이별 후에도 씩씩하게 살아가는 다짐을 담은 곡, 어쿠스틱 팝"), 22.8s, no fallback
+warning logged — showed genuine theory application (verse-to-chorus energy build described
+concretely in `fields.prompt`, matching the tension-and-release/arrangement-as-form principles) but
+also two concrete quality issues:
+
+1. `fields.title` was cluttered with meta-commentary in a parenthetical: `"My Own Way (My Brand New
+   Day / 나의 길을 가겠어 - 이별 극복 다짐송 인터프리테이션 및 작사안 포함편... )"` — not a usable
+   song title.
+2. `fields.structureNotes` was omitted entirely (the field is optional), so no explicit
+   Intro/Verse/Chorus/etc. section breakdown was produced despite the theory doc's own
+   AI-prompting-advice section recommending exactly that.
+
+### Implementation
+
+Added two explicit bullets to `provider-compiler.system.md`'s "Your job" section:
+
+- `fields.title` must be a clean, singable title only — no parenthetical meta-commentary, no notes
+  about the interpretation process; a bilingual `Korean / English` pair is fine, commentary is not.
+- `fields.structureNotes` should be populated by default (named sections in order + a one-line
+  function/energy note each), left empty only when the design genuinely calls for an
+  unstructured/freeform piece — not merely because the input spec didn't specify one.
+
+`pnpm typecheck`/`lint`/`test` (173/173) all pass — this is a prompt-instruction-only change, no
+schema/code logic touched.
+
+### Honest verification status
+
+Two live retests immediately after this change both hit the ~90s client timeout and fell back to
+Mock (server log: plain `TimeoutError`, not the ADR-052 "high demand" 500). Gemini's intermittent
+unreliability from the prior session has not resolved as of this date, so **this fix's actual live
+effect on `title`/`structureNotes` output is not yet confirmed** — committed on the strength of the
+diagnosis (a concrete, reproducible quality issue from a genuine sample) and passing quality gates,
+not on live proof the wording change works. Live confirmation is deferred to the next session when
+Gemini responds more reliably (see the standing memory note on this).
+
+### Reason
+
+Both issues were observed directly in an actual (non-hypothetical) Gemini response, not guessed at.
+Fixing prompt wording for a concretely observed defect is low-risk and cheap to try even without
+immediate live confirmation, given how difficult obtaining a clean real-Gemini sample has been this
+week — but the honesty principle from ADR-049 applies again: don't claim a fix works before seeing
+it work.
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:

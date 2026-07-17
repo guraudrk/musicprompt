@@ -1665,3 +1665,44 @@ See `DECISIONS.md` ADR-052.
   the documented `gemini-2.5-flash` GA-stable alternative to check whether it is less congested —
   not yet attempted, paused per user decision along with further live retries.
 - Everything already carried forward from ADR-049/050/051 remains pending.
+
+## First clean real-Gemini sample + title/structureNotes prompt fix (2026-07-17, ADR-053)
+
+### Why
+
+Returning to the two verification tasks left pending on 2026-07-15 (real-Gemini theory-groundedness
+for a general sentence, and ADR-052's live effect), a quick raw ping confirmed Gemini responding
+normally again (4.6s), so live verification resumed.
+
+### What was found
+
+The very first non-Mock-fallback response since ADR-050/051/052 (22.8s, no fallback warning in the
+server log) genuinely showed theory application — `fields.prompt` explicitly described a
+verse-to-chorus energy build ("soft, intimate verse" → "bright, hopeful, and driving chorus"),
+matching the tension-and-release/arrangement-as-form principles rather than generic adjective
+stacking. `revisionLevers` were concrete and specific. Two real defects were visible in the same
+sample: `fields.title` contained cluttered parenthetical meta-commentary instead of a usable title,
+and `fields.structureNotes` was left empty (an optional field) despite the theory doc's own advice
+to name sections explicitly.
+
+### What shipped
+
+Two explicit bullets added to `provider-compiler.system.md`: `fields.title` must be a clean,
+singable title with no interpretation-commentary; `fields.structureNotes` should be populated by
+default (named sections + one-line function per section) unless the design is genuinely freeform.
+Prompt-only change; `pnpm typecheck`/`lint`/`test` (173/173) pass.
+
+### Honest verification status
+
+Two live retests immediately after this change both hit the ~90s timeout and fell back to Mock —
+Gemini's intermittent unreliability has not resolved since the prior session. This fix's actual
+live effect on `title`/`structureNotes` quality remains unconfirmed as of this date.
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-053.
+
+### Known gaps carried forward
+
+- ADR-053's live effect is unconfirmed — retry once Gemini responds more reliably.
+- Everything already carried forward from ADR-049 through ADR-052 remains pending.
