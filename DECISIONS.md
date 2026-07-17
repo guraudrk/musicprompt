@@ -1791,6 +1791,87 @@ it work.
 
 ---
 
+## ADR-054 — Retry once against a fallback model on a transient server error or a primary-model timeout
+
+- Status: Accepted
+- Date: 2026-07-17
+
+### Decision
+
+The user explicitly asked to solve the underlying Gemini reliability problem, not just document it
+as external. Two genuinely actionable levers existed:
+
+1. ADR-052 already captured Google returning an explicit `500 ... currently experiencing high
+   demand` error for `gemini-3.5-flash` — a case where retrying against a *different* model (the
+   documented `gemini-2.5-flash` GA-stable alternative) is a legitimately different attempt, not a
+   repeat of the same slow request ADR-049 already found unhelpful to retry.
+2. A plain client-side timeout could plausibly benefit from the same idea, but ADR-049 specifically
+   warned against compounding wait by retrying an identical request — the user chose (via a direct
+   trade-off question) to extend fallback to timeouts too, but capped the fallback attempt's own
+   budget at 30s (not another 90s), bounding worst-case total wait at 90s + 30s = 120s rather than
+   letting it compound to 180s+.
+
+### Implementation
+
+- `src/lib/env.ts`: `GeminiEnvConfig` gains `fallbackModel`, read from optional `GEMINI_FALLBACK_MODEL`
+  (defaults to `gemini-2.5-flash` if unset — no required setup).
+- `src/llm/gemini/resilience.ts`: new `GEMINI_FALLBACK_AFTER_TIMEOUT_OPTIONS` (`{ timeout: 30_000,
+  maxRetries: 0 }`); new `isTransientServerError` (an `ApiError` with `status >= 500`); new
+  `isTimeoutError`, which duck-types by `error.constructor.name === "APIConnectionTimeoutError"`
+  since that class isn't part of `@google/genai`'s exported public API (only `ApiError` is) —
+  confirmed empirically via live testing that this is reliably the constructor name a client-side
+  timeout throws.
+- `src/llm/gemini/geminiLLMProvider.ts`: on a primary-model failure, if it's a transient server
+  error or a timeout *and* the configured fallback model differs from the primary, retry once
+  against the fallback model (with the shorter timeout budget specifically for the post-timeout
+  case), logging a distinct `[GeminiLLMProvider]` warning either way. If the fallback attempt also
+  fails, its own mapped error surfaces (no further retries).
+- Also fixed, from a defect this live-verification surfaced: `stripMarkdownFence()` strips a
+  ```` ```json ... ``` ```` wrapper before `JSON.parse`, since the fallback model was observed live
+  wrapping its structured output in a code fence despite the system instruction saying not to.
+- 8 new/updated unit tests in `tests/unit/geminiLLMProvider.test.ts` (transient-error fallback
+  success, timeout fallback success with the shorter budget, fallback also failing surfaces its own
+  error, same-model guard, generic-error non-retry, fence-stripping). All 180 project unit tests
+  pass; typecheck/lint clean.
+
+### Honest verification status — real progress, one new issue found, not fully resolved
+
+Live-verifying this repeatedly through the actual demo endpoint showed the mechanism genuinely
+working: a primary-model timeout correctly triggered a fallback attempt (confirmed via the new log
+line), which sometimes succeeded. However, two runs surfaced further real issues, not invented:
+
+- One fallback response came back wrapped in a markdown code fence (now fixed by
+  `stripMarkdownFence`).
+- Another fallback response was valid JSON but failed the strict Zod schema (`revisionLevers[].
+  safeAdjustment` was `undefined` in one array entry) — `gemini-2.5-flash` did not honor the schema
+  as precisely as the primary model in this instance. This failure currently happens inside
+  `generateStructured`'s raw parse/validate step, **before** `compiler/pipeline.ts`'s own Stage E
+  validate/repair loop ever gets a chance to attempt a repair pass — meaning a schema-shape mismatch
+  at this layer is currently unrecoverable and falls straight through to the dev Mock fallback (or a
+  production error), the same as it would for the primary model. This is a materially different,
+  deeper problem than today's timeout/demand-error work, and is intentionally left for a future
+  session rather than folded in here under time pressure.
+
+### Reason
+
+This is a genuine code-level reliability improvement (not just documentation of an external
+problem), directly answering the user's request to actually solve the Gemini response problem
+rather than only explain it. The trade-off (capped extra wait vs. better success rate) was a real
+decision point, not an implementation detail, so it was put to the user rather than decided
+unilaterally. The newly surfaced schema-mismatch-from-fallback-model issue is recorded honestly as
+a next-session item rather than silently absorbed into this ADR's scope.
+
+### Next steps (not yet started)
+
+- Consider whether a schema-invalid (but valid-JSON) response should get one repair-pass attempt
+  even at the `generateStructured` layer, rather than only when `compiler/pipeline.ts`'s own
+  post-`compile()` validation fails.
+- Once more live data accumulates, assess whether `gemini-2.5-flash` needs the same guidance
+  reinforcement (title/structureNotes, ADR-053) that `gemini-3.5-flash` received, or whether it
+  needs different handling given its apparently looser schema adherence.
+
+---
+
 ## Pending decisions
 
 The following must be decided after repository inspection, and remain open:

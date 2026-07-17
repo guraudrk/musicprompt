@@ -767,7 +767,18 @@ Each requires official capability verification and tests.
     typecheck/lint/test (173/173) pass (prompt-only change). Two live retests immediately after
     both hit the 90s timeout/Mock fallback again, so this fix's live effect is not yet confirmed —
     deferred to next session per the standing memory note once Gemini responds more reliably.
-27. **Next actual work**: replacing the in-memory demo rate limiter with a shared store (Vercel
+27. ~~Retry once against a fallback model on a transient (5xx) Gemini error or a primary-model
+    timeout.~~ Done — ADR-054. User explicitly asked to solve the Gemini reliability problem, not
+    just document it as external. Added `GEMINI_FALLBACK_MODEL` (defaults to `gemini-2.5-flash`);
+    `GeminiLLMProvider` now retries once against it on a transient 5xx or a timeout (timeout retry
+    capped at a 30s budget, so worst case is 90s+30s=120s, not a 180s+ compounding wait). Also fixed
+    a markdown-code-fence-wrapped response the fallback model was observed producing. 8 new/updated
+    unit tests, 180 total pass. Live-verified the mechanism genuinely triggers and sometimes
+    succeeds — but also surfaced a new issue: the fallback model doesn't always honor the strict
+    schema (one response had a missing required field), and that failure currently happens before
+    `pipeline.ts`'s own repair-pass loop gets a chance — left for a future session as a materially
+    different, deeper problem than today's timeout/demand work.
+28. **Next actual work**: replacing the in-memory demo rate limiter with a shared store (Vercel
     KV/Upstash Redis) before actual Vercel deployment is now a concrete, well-scoped pre-deployment
     task (ADR-046); the larger structure/emotionCurve/contrastPlan/hookPlan inference
     follow-up to item 17 is now a real, well-scoped candidate; translating `/dashboard` and the

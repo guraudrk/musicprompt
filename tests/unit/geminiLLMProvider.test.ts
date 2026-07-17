@@ -16,6 +16,11 @@ vi.mock("@google/genai", async () => {
 const { GeminiLLMProvider } = await import("@/llm/gemini/geminiLLMProvider");
 const { ApiError } = await import("@google/genai");
 
+/** Stand-in for the SDK's internal (non-exported) timeout error class, matched in
+ * resilience.ts's `isTimeoutError` by constructor name (see ADR-054). */
+class FakeTimeoutError extends Error {}
+Object.defineProperty(FakeTimeoutError, "name", { value: "APIConnectionTimeoutError" });
+
 describe("GeminiLLMProvider", () => {
   const ORIGINAL_ENV = { ...process.env };
 
@@ -65,6 +70,20 @@ describe("GeminiLLMProvider", () => {
     expect(options).toEqual({ timeout: 90_000, maxRetries: 0 });
   });
 
+  it("strips a ```json code fence around output_text before parsing (observed from a real fallback-model response)", async () => {
+    mockCreate.mockResolvedValue({ output_text: "```json\n" + JSON.stringify({ hello: "world" }) + "\n```" });
+    const provider = new GeminiLLMProvider();
+
+    const result = await provider.generateStructured({
+      task: "t",
+      systemInstruction: "s",
+      payload: {},
+      schema: z.object({ hello: z.string() }),
+    });
+
+    expect(result).toEqual({ hello: "world" });
+  });
+
   it("throws when the SDK returns no output_text", async () => {
     mockCreate.mockResolvedValue({ output_text: undefined });
     const provider = new GeminiLLMProvider();
@@ -95,5 +114,93 @@ describe("GeminiLLMProvider", () => {
     await expect(
       provider.generateStructured({ task: "t", systemInstruction: "s", payload: {}, schema: z.object({}) }),
     ).rejects.toThrow(/rate limit/i);
+  });
+
+  it("retries once against the fallback model on a transient (5xx) server error, and succeeds (ADR-054)", async () => {
+    process.env.GEMINI_MODEL = "gemini-3.5-flash";
+    // GEMINI_FALLBACK_MODEL left unset, so it defaults to "gemini-2.5-flash" (distinct from above).
+    mockCreate
+      .mockRejectedValueOnce(new ApiError({ message: "currently experiencing high demand", status: 500 }))
+      .mockResolvedValueOnce({ output_text: JSON.stringify({ hello: "world" }) });
+    const provider = new GeminiLLMProvider();
+
+    const result = await provider.generateStructured({
+      task: "t",
+      systemInstruction: "s",
+      payload: {},
+      schema: z.object({ hello: z.string() }),
+    });
+
+    expect(result).toEqual({ hello: "world" });
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+    expect(mockCreate.mock.calls[0][0].model).toBe("gemini-3.5-flash");
+    expect(mockCreate.mock.calls[1][0].model).toBe("gemini-2.5-flash");
+  });
+
+  it("retries once against the fallback model on a primary-model timeout, using the shorter fallback timeout budget (ADR-054)", async () => {
+    process.env.GEMINI_MODEL = "gemini-3.5-flash";
+    mockCreate
+      .mockRejectedValueOnce(new FakeTimeoutError("Request timed out"))
+      .mockResolvedValueOnce({ output_text: JSON.stringify({ hello: "world" }) });
+    const provider = new GeminiLLMProvider();
+
+    const result = await provider.generateStructured({
+      task: "t",
+      systemInstruction: "s",
+      payload: {},
+      schema: z.object({ hello: z.string() }),
+    });
+
+    expect(result).toEqual({ hello: "world" });
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+    expect(mockCreate.mock.calls[0][1]).toEqual({ timeout: 90_000, maxRetries: 0 });
+    expect(mockCreate.mock.calls[1][0].model).toBe("gemini-2.5-flash");
+    expect(mockCreate.mock.calls[1][1]).toEqual({ timeout: 30_000, maxRetries: 0 });
+  });
+
+  it("does not retry a fallback-model timeout again — surfaces the error after the single fallback attempt", async () => {
+    process.env.GEMINI_MODEL = "gemini-3.5-flash";
+    mockCreate.mockRejectedValue(new FakeTimeoutError("Request timed out"));
+    const provider = new GeminiLLMProvider();
+
+    await expect(
+      provider.generateStructured({ task: "t", systemInstruction: "s", payload: {}, schema: z.object({}) }),
+    ).rejects.toThrow(/timed out/i);
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry on a generic error that isn't a recognized timeout or transient-server signature", async () => {
+    mockCreate.mockRejectedValue(new Error("Something else went wrong"));
+    const provider = new GeminiLLMProvider();
+
+    await expect(
+      provider.generateStructured({ task: "t", systemInstruction: "s", payload: {}, schema: z.object({}) }),
+    ).rejects.toThrow(/something else went wrong/i);
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry when the fallback model is the same as the primary model", async () => {
+    process.env.GEMINI_MODEL = "gemini-2.5-flash";
+    process.env.GEMINI_FALLBACK_MODEL = "gemini-2.5-flash";
+    mockCreate.mockRejectedValue(new ApiError({ message: "currently experiencing high demand", status: 500 }));
+    const provider = new GeminiLLMProvider();
+
+    await expect(
+      provider.generateStructured({ task: "t", systemInstruction: "s", payload: {}, schema: z.object({}) }),
+    ).rejects.toThrow(/transient server error/i);
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces the fallback model's own error if it also fails", async () => {
+    process.env.GEMINI_MODEL = "gemini-3.5-flash";
+    mockCreate
+      .mockRejectedValueOnce(new ApiError({ message: "high demand", status: 500 }))
+      .mockRejectedValueOnce(new ApiError({ message: "Too Many Requests", status: 429 }));
+    const provider = new GeminiLLMProvider();
+
+    await expect(
+      provider.generateStructured({ task: "t", systemInstruction: "s", payload: {}, schema: z.object({}) }),
+    ).rejects.toThrow(/rate limit/i);
+    expect(mockCreate).toHaveBeenCalledTimes(2);
   });
 });

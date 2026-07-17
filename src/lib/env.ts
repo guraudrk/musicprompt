@@ -4,6 +4,10 @@ export type GeminiEnvConfig = {
   apiKey: string;
   model: string;
   apiMode: string;
+  /** ADR-054: documented GA-stable alternative model to retry against, once, when the primary
+   * model returns a transient server-side error (e.g. "currently experiencing high demand").
+   * Optional — defaults to `gemini-2.5-flash` when `GEMINI_FALLBACK_MODEL` is unset. */
+  fallbackModel: string;
 };
 
 const PLACEHOLDER_PREFIX = "REPLACE_WITH";
@@ -30,7 +34,9 @@ export function getGeminiEnvConfig(): GeminiEnvConfig {
     throw new Error("GEMINI_API_MODE is not configured. Set it in .env.local.");
   }
 
-  return { apiKey, model, apiMode };
+  const fallbackModel = process.env.GEMINI_FALLBACK_MODEL || "gemini-2.5-flash";
+
+  return { apiKey, model, apiMode, fallbackModel };
 }
 
 /** Non-throwing check used to choose Gemini vs. Mock at startup (src/lib/compilerDeps.ts). */

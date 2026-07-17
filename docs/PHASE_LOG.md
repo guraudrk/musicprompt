@@ -1706,3 +1706,43 @@ See `DECISIONS.md` ADR-053.
 
 - ADR-053's live effect is unconfirmed — retry once Gemini responds more reliably.
 - Everything already carried forward from ADR-049 through ADR-052 remains pending.
+
+## Fallback-model retry on transient errors and timeouts (2026-07-17, ADR-054)
+
+### Why
+
+The user pushed back on treating today's Gemini unreliability as purely external/undocumentable,
+asking to actually fix the response problem rather than only log it. Two levers were genuinely
+actionable: retrying against the documented `gemini-2.5-flash` alternative on the explicit "high
+demand" 500 error ADR-052 already captured, and — after a direct trade-off question about whether
+the added worst-case wait was acceptable — extending the same idea to plain timeouts, with a
+shorter, capped budget for the fallback attempt so worst case is 120s, not a 180s+ compounding wait.
+
+### What shipped
+
+New `GEMINI_FALLBACK_MODEL` env var (optional, defaults to `gemini-2.5-flash`). `GeminiLLMProvider`
+now retries once against it when the primary model returns a transient 5xx or times out (the
+timeout case uses a 30s fallback budget vs. the primary's 90s). Also fixed a markdown-code-fence-
+wrapped response the fallback model was observed producing live, via a small `stripMarkdownFence`
+step before JSON parsing. 8 new/updated unit tests; 180 total pass; typecheck/lint clean.
+
+### Live verification — real progress, one new issue surfaced
+
+Confirmed via server logs that the fallback mechanism genuinely triggers on both a real timeout and
+(previously) the demand-side 500. One retry succeeded end-to-end after a primary timeout. Another
+retry got a valid JSON response from the fallback model that nonetheless failed strict schema
+validation (a required `revisionLevers[].safeAdjustment` field was missing) — meaning
+`gemini-2.5-flash` doesn't always honor the schema as precisely as the primary model. That failure
+happens before `pipeline.ts`'s own repair-pass loop can attempt a fix, so it's currently
+unrecoverable at that layer. Recorded as a real, deeper follow-up item rather than solved today.
+
+### Decisions recorded
+
+See `DECISIONS.md` ADR-054.
+
+### Known gaps carried forward
+
+- Whether a schema-invalid (but valid-JSON) response should get a repair-pass chance even at the
+  `generateStructured` layer is an open design question.
+- ADR-053's live effect is still unconfirmed.
+- Everything already carried forward from ADR-049 through ADR-053 remains pending.

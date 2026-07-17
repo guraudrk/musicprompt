@@ -18,6 +18,37 @@ import { ApiError } from "@google/genai";
  */
 export const GEMINI_REQUEST_OPTIONS = { timeout: 90_000, maxRetries: 0 };
 
+/** ADR-054: budget for the *fallback-model* retry after a primary-model timeout — deliberately
+ * shorter than `GEMINI_REQUEST_OPTIONS`, so a worst case (primary times out, fallback also times
+ * out) is capped at 90s + 30s = 120s rather than compounding to 180s, unlike the identical-request
+ * retry ADR-049 removed for exactly that reason. */
+export const GEMINI_FALLBACK_AFTER_TIMEOUT_OPTIONS = { timeout: 30_000, maxRetries: 0 };
+
+/**
+ * ADR-054: identifies a transient server-side error (HTTP 5xx, e.g. "gemini-3.5-flash is currently
+ * experiencing high demand") — one of the two failure modes this project retries against a
+ * fallback model for.
+ */
+export function isTransientServerError(error: unknown): boolean {
+  return error instanceof ApiError && typeof error.status === "number" && error.status >= 500;
+}
+
+/**
+ * ADR-054: identifies a client-side timeout — the other failure mode retried against a fallback
+ * model, using the shorter `GEMINI_FALLBACK_AFTER_TIMEOUT_OPTIONS` budget. Not the same situation
+ * ADR-049 already ruled out: that was retrying the *identical request against the same model*,
+ * which rarely helps because the model is just as slow the second time. Retrying against a
+ * *different* model is a genuinely different attempt, not a repeat of a slow one.
+ *
+ * Duck-typed by constructor name rather than `instanceof`, because the SDK's timeout error
+ * (`APIConnectionTimeoutError`) is an internal class, not exported from `@google/genai`'s public
+ * API surface (only `ApiError` is) — confirmed empirically via live testing (2026-07-17) that a
+ * client-side timeout's `error.constructor.name` is always this string.
+ */
+export function isTimeoutError(error: unknown): boolean {
+  return error instanceof Error && error.constructor?.name === "APIConnectionTimeoutError";
+}
+
 /**
  * Maps the SDK's `ApiError` (has a `.status` HTTP code) to a clearer, user-facing message for the
  * well-known cases. Rate limiting (429) is deliberately not something we auto-retry into — it gets

@@ -14,7 +14,7 @@ export const PromptFieldsSchema = z.object({
   lyrics: z.string().optional(),
   negativePrompt: z.string().optional(),
   exclude: z.string().optional(),
-  title: z.string().optional(),
+  title: z.string().max(80).optional(),
   guidanceTags: z.array(z.string()).max(8).optional(),
   structureNotes: z.string().optional(),
   advancedParameters: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
